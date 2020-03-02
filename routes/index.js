@@ -1,0 +1,15 @@
+const express = require('express')
+const router = express.Router()
+const jwt = require('express-jwt')
+const auth = jwt({
+    secret: process.env.JWT_SECRET
+})
+
+const maximoController = require('../controllers/maximo')
+const testController = require('../controllers/test')
+
+router.post('/authentication', maximoController.authentication)
+router.get('/workOrders', auth, maximoController.getWorkOrders)
+router.get('/test', auth, testController.test)
+
+module.exports = router
