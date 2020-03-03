@@ -85,30 +85,45 @@ module.exports.getWorkOrders = async (req, res) => {
     const maximo = new Maximo(options);
     let workOrders = await maximo.resourceobject("MXAPIWODETAIL")
         .select(["wonum", "description", "description_longdescription", "assetnum",
-            "location", "worktype", "wopriority", "gb_abc", "status", "schedstart", "schedfinish",
-            "supervisor", "reportdate", "estdur", "taskid",])
+            "location", "location.description", "worktype", "wopriority", "gb_abc", "status", "schedstart", "schedfinish",
+            "supervisor", "reportdate", "estdur", "taskid","targstartdate"])
         .where("status").in(["INPRG", "APPR"])
         .orderby('wonum', 'desc')
         .pagesize(20)
         .fetch()
 
     workOrders = workOrders.thisResourceSet()
-    
-    const promiseArray = []
-    for (let i = 0; i < workOrders.length; i++) {        
+
+    let assetPromiseArray = []
+    let locationPromiseArray = []
+
+    for (let i = 0; i < workOrders.length; i++) {
         let asset = maximo.resourceobject("MXAPIASSET")
             .select(["wonum", "description"])
             .where("assetnum").in([workOrders[i].assetnum])
             .fetch()
-        promiseArray.push(asset)        
+        assetPromiseArray.push(asset)
+
+        // let location = maximo.resourceobject("MXAPILOCATIONS")
+        //     .select(['description'])
+        //     .where("location").in([workOrders[i].location])
+        //     .fetch()
+        // locationPromiseArray.push(location)
+
     }
 
-    const results = await Promise.all(promiseArray)
-    for(let i = 0; i < workOrders.length; i++) {
-        let asset = (results[i].thisResourceSet())[0]
-        workOrders[i].asset = asset        
+    let assetResults = await Promise.all(assetPromiseArray)
+    for (let i = 0; i < workOrders.length; i++) {
+        let asset = (assetResults[i].thisResourceSet())[0]
+        workOrders[i].asset = asset
     }
 
+    // let locationResults = await Promise.all(locationPromiseArray)
+    // for (let i = 0; i < workOrders.length; i++) {
+    //     let location = (locationResults[i].thisResourceSet())[0]
+    //     console.log(location)
+    //     workOrders[i].locationDetails = location
+    // }
     sendJSONresponse(res, 200, { status: 'OK', payload: workOrders })
     return
 }
