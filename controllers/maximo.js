@@ -35,10 +35,10 @@ module.exports.authentication = (req, res) => {
         .where("status").in(["INPRG", "APPR"])
         .orderby('wonum', 'desc')
         .pagesize(20)
-        .fetch()        
+        .fetch()
         .then(async function (resourceset) {
-            
-            
+
+
             if (((resourceset || {}).resourcemboset || {}).Error) {
                 sendJSONresponse(res, 401, { status: 'ERROR', message: resourceset.resourcemboset.Error.message })
                 return
@@ -62,7 +62,7 @@ module.exports.authentication = (req, res) => {
         })
 }
 
-module.exports.getWorkOrders = (req, res) => {
+module.exports.getWorkOrders = async (req, res) => {
     const user = req.user.user
     const password = req.user.password
 
@@ -83,20 +83,64 @@ module.exports.getWorkOrders = (req, res) => {
     }
 
     const maximo = new Maximo(options);
-    maximo.resourceobject("MXAPIWODETAIL")
-        // .select(["wonum", "description", "description_longdescription", "assetnum", 
-        // "location", "worktype", "wopriority", "gb_abc", "status", "schedstart", "schedfinish", 
-        // "supervisor", "reportdate", "estdur", "taskid", ])
+    let workOrders = await maximo.resourceobject("MXAPIWODETAIL")
+        .select(["wonum", "description", "description_longdescription", "assetnum",
+            "location", "worktype", "wopriority", "gb_abc", "status", "schedstart", "schedfinish",
+            "supervisor", "reportdate", "estdur", "taskid",])
         .where("status").in(["INPRG", "APPR"])
         .orderby('wonum', 'desc')
         .pagesize(20)
         .fetch()
-        .then(function (resourceset) {
-            jsondata = resourceset.thisResourceSet();
-            
-            sendJSONresponse(res, 200, jsondata)
-        })
-        .fail(function (error) {
-            console.log('****** Error Code = ' + error);
-        });
+
+    workOrders = workOrders.thisResourceSet()
+    
+    const promiseArray = []
+    for (let i = 0; i < workOrders.length; i++) {        
+        let asset = maximo.resourceobject("MXAPIASSET")
+            .select(["wonum", "description"])
+            .where("assetnum").in([workOrders[i].assetnum])
+            .fetch()
+        promiseArray.push(asset)        
+    }
+
+    const results = await Promise.all(promiseArray)
+    for(let i = 0; i < workOrders.length; i++) {
+        let asset = (results[i].thisResourceSet())[0]
+        workOrders[i].asset = asset        
+    }
+
+    sendJSONresponse(res, 200, { status: 'OK', payload: workOrders })
+    return
+}
+
+module.exports.getAsset = async (req, res) => {
+    const user = req.user.user
+    const password = req.user.password
+    const assetnum = req.params.assetnum
+
+    if (!user || !password || !assetnum) {
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Inicia sesión para realizar la operación' })
+        return
+    }
+
+    const options = {
+        protocol: 'https',
+        hostname: process.env.MAXIMO_HOSTNAME,
+        port: process.env.MAXIMO_PORT,
+        user: user,
+        password: password,
+        auth_scheme: '/maximo',
+        authtype: 'maxauth',
+        islean: 1
+    }
+
+    const maximo = new Maximo(options)
+    let jsondata = await maximo.resourceobject("MXAPIASSET")
+        .select(["wonum", "description"])
+        .where("assetnum").in([assetnum])
+        .fetch()
+
+    let asset = (jsondata.thisResourceSet())[0]
+    sendJSONresponse(res, 200, { status: 'OK', payload: asset })
+    return
 }
