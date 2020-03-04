@@ -11,6 +11,7 @@ const testController = require('../controllers/test')
 router.post('/authentication', maximoController.authentication)
 router.get('/workOrders', auth, maximoController.getWorkOrders)
 router.get('/asset/:assetnum', auth, maximoController.getAsset)
+router.get('/jobPlan/:jpnum', auth, maximoController.getJobPlan)
 router.get('/test', auth, testController.test)
 
 module.exports = router

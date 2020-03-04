@@ -86,7 +86,7 @@ module.exports.getWorkOrders = async (req, res) => {
     let workOrders = await maximo.resourceobject("MXAPIWODETAIL")
         .select(["wonum", "description", "description_longdescription", "assetnum",
             "location", "location.description", "worktype", "wopriority", "gb_abc", "status", "schedstart", "schedfinish",
-            "supervisor", "reportdate", "estdur", "taskid","targstartdate"])
+            "supervisor", "reportdate", "estdur", "taskid", "targstartdate", "jobtaskid", "jpnum"])
         .where("status").in(["INPRG", "APPR"])
         .orderby('wonum', 'desc')
         .pagesize(20)
@@ -95,7 +95,7 @@ module.exports.getWorkOrders = async (req, res) => {
     workOrders = workOrders.thisResourceSet()
 
     let assetPromiseArray = []
-    let locationPromiseArray = []
+    let jobPlanPromiseArray = []
 
     for (let i = 0; i < workOrders.length; i++) {
         let asset = maximo.resourceobject("MXAPIASSET")
@@ -104,12 +104,11 @@ module.exports.getWorkOrders = async (req, res) => {
             .fetch()
         assetPromiseArray.push(asset)
 
-        // let location = maximo.resourceobject("MXAPILOCATIONS")
-        //     .select(['description'])
-        //     .where("location").in([workOrders[i].location])
-        //     .fetch()
-        // locationPromiseArray.push(location)
-
+        let jobPlan = maximo.resourceobject("REP_JOBPLAN")
+            .select(['*'])
+            .where("jpnum").in([workOrders[i].jpnum])
+            .fetch()
+        jobPlanPromiseArray.push(jobPlan)
     }
 
     let assetResults = await Promise.all(assetPromiseArray)
@@ -118,12 +117,11 @@ module.exports.getWorkOrders = async (req, res) => {
         workOrders[i].asset = asset
     }
 
-    // let locationResults = await Promise.all(locationPromiseArray)
-    // for (let i = 0; i < workOrders.length; i++) {
-    //     let location = (locationResults[i].thisResourceSet())[0]
-    //     console.log(location)
-    //     workOrders[i].locationDetails = location
-    // }
+    let jobPlanResults = await Promise.all(jobPlanPromiseArray)
+    for (let i = 0; i < jobPlanResults.length; i++) {
+        let jobPlan = (jobPlanResults[i].thisResourceSet())[0]        
+        workOrders[i].jobPlan = jobPlan
+    }
     sendJSONresponse(res, 200, { status: 'OK', payload: workOrders })
     return
 }
@@ -157,5 +155,37 @@ module.exports.getAsset = async (req, res) => {
 
     let asset = (jsondata.thisResourceSet())[0]
     sendJSONresponse(res, 200, { status: 'OK', payload: asset })
+    return
+}
+
+module.exports.getJobPlan = async (req, res) => {
+    const user = req.user.user
+    const password = req.user.password
+    const jpnum = req.params.jpnum
+
+    if (!user || !password || !jpnum) {
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ingresa todos los campos requeridos' })
+        return
+    }
+
+    const options = {
+        protocol: 'https',
+        hostname: process.env.MAXIMO_HOSTNAME,
+        port: process.env.MAXIMO_PORT,
+        user: user,
+        password: password,
+        auth_scheme: '/maximo',
+        authtype: 'maxauth',
+        islean: 1
+    }
+
+    const maximo = new Maximo(options)
+    let jsondata = await maximo.resourceobject("REP_JOBPLAN")
+        .select(["*"])
+        .where("jpnum").in([jpnum])
+        .fetch()
+
+    let jobPlan = (jsondata.thisResourceSet())[0]
+    sendJSONresponse(res, 200, { status: 'OK', payload: jobPlan })
     return
 }
