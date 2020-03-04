@@ -86,7 +86,7 @@ module.exports.getWorkOrders = async (req, res) => {
     let workOrders = await maximo.resourceobject("MXAPIWODETAIL")
         .select(["wonum", "description", "description_longdescription", "assetnum",
             "location", "location.description", "worktype", "wopriority", "gb_abc", "status", "schedstart", "schedfinish",
-            "supervisor", "reportdate", "estdur", "taskid", "targstartdate", "jobtaskid", "jpnum"])
+            "supervisor", "reportdate", "estdur", "taskid", "targstartdate", "jobtaskid", "jpnum",])
         .where("status").in(["INPRG", "APPR"])
         .orderby('wonum', 'desc')
         .pagesize(20)
@@ -104,11 +104,11 @@ module.exports.getWorkOrders = async (req, res) => {
             .fetch()
         assetPromiseArray.push(asset)
 
-        let jobPlan = maximo.resourceobject("REP_JOBPLAN")
-            .select(['*'])
-            .where("jpnum").in([workOrders[i].jpnum])
-            .fetch()
-        jobPlanPromiseArray.push(jobPlan)
+        // let jobPlan = maximo.resourceobject("REP_JOBPLAN")
+        //     .select(['*'])
+        //     .where("jpnum").in([workOrders[i].jpnum])
+        //     .fetch()
+        // jobPlanPromiseArray.push(jobPlan)
     }
 
     let assetResults = await Promise.all(assetPromiseArray)
@@ -117,11 +117,11 @@ module.exports.getWorkOrders = async (req, res) => {
         workOrders[i].asset = asset
     }
 
-    let jobPlanResults = await Promise.all(jobPlanPromiseArray)
-    for (let i = 0; i < jobPlanResults.length; i++) {
-        let jobPlan = (jobPlanResults[i].thisResourceSet())[0]        
-        workOrders[i].jobPlan = jobPlan
-    }
+    // let jobPlanResults = await Promise.all(jobPlanPromiseArray)
+    // for (let i = 0; i < jobPlanResults.length; i++) {
+    //     let jobPlan = (jobPlanResults[i].thisResourceSet())[0]
+    //     workOrders[i].jobPlan = jobPlan
+    // }
     sendJSONresponse(res, 200, { status: 'OK', payload: workOrders })
     return
 }
@@ -186,6 +186,53 @@ module.exports.getJobPlan = async (req, res) => {
         .fetch()
 
     let jobPlan = (jsondata.thisResourceSet())[0]
+
+    // let laborPromiseArray = []
+    // for (let i = 0; i < jobPlan.joblabor.length; i++) {
+    //     let labor = maximo.resourceobject("REP_LABOR")
+    //         .select(["*"])
+    //         .where("laborid").in([jobPlan.joblabor[i].joblaborid])
+    //         .fetch()
+    //     laborPromiseArray.push(labor)        
+    // }
+
+    // let laborResults = await Promise.all(laborPromiseArray)
+    // for (let i = 0; i < laborResults.length; i++) {
+    //     let labor = (laborResults[i].thisResourceSet())[0]
+    //     jobPlan[i].jobPlan = jobPlan
+    // }
     sendJSONresponse(res, 200, { status: 'OK', payload: jobPlan })
+    return
+}
+
+module.exports.getWorkOrderWithPlans = async (req, res) => {
+    const user = req.user.user
+    const password = req.user.password
+    const wonum = req.params.wonum
+
+    if (!user || !password || !wonum) {
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ingresa todos los campos requeridos' })
+        return
+    }
+
+    const options = {
+        protocol: 'https',
+        hostname: process.env.MAXIMO_HOSTNAME,
+        port: process.env.MAXIMO_PORT,
+        user: user,
+        password: password,
+        auth_scheme: '/maximo',
+        authtype: 'maxauth',
+        islean: 1
+    }
+
+    const maximo = new Maximo(options)
+    let jsondata = await maximo.resourceobject("MXWODETAIL")
+        .select(["*", "wpmaterial"])
+        .where("wonum").in([wonum])
+        .fetch()
+
+    let wo = (jsondata.thisResourceSet())[0]
+    sendJSONresponse(res, 200, { status: 'OK', payload: wo })
     return
 }
