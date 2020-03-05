@@ -1,5 +1,6 @@
 const Maximo = require('ibm-maximo-api')
 const jwt = require('jsonwebtoken')
+const rp = require('request-promise')
 
 
 sendJSONresponse = function (res, status, content) {
@@ -347,5 +348,27 @@ module.exports.getLabor = async (req, res) => {
     }
 
     sendJSONresponse(res, 200, { status: 'OK', payload: labor })
+    return
+}
+
+module.exports.getWhoAmI = async (req, res) => {
+    const user = req.user.user
+    const password = req.user.password   
+
+    if (!user || !password ) {
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ingresa todos los campos requeridos' })
+        return
+    }
+
+    let response = await rp('https://' + process.env.MAXIMO_HOSTNAME + `/maximo/oslc/whoami?_lid=${user}&_lpwd=${password}`)
+    response = JSON.parse(response)
+
+    if(!response ) {
+        console.log(response)
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ocurrió un error al intentar obtener los datos'})
+        return
+    }
+
+    sendJSONresponse(res, 200, { status: 'OK', payload: response })
     return
 }
