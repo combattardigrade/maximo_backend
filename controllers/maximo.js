@@ -153,7 +153,16 @@ module.exports.getAsset = async (req, res) => {
         .where("assetnum").in([assetnum])
         .fetch()
 
-    let asset = (jsondata.thisResourceSet())[0]
+    let asset
+    try {
+        asset = (jsondata.thisResourceSet())[0]
+    }
+    catch (e) {
+        console.log(e)
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ocurrió un error al intentar obtener los datos' })
+        return
+    }
+
     sendJSONresponse(res, 200, { status: 'OK', payload: asset })
     return
 }
@@ -185,27 +194,22 @@ module.exports.getJobPlan = async (req, res) => {
         .where("jpnum").in([jpnum])
         .fetch()
 
-    let jobPlan = (jsondata.thisResourceSet())[0]
+    let jobPlan
+    try {
+        jobPlan = (jsondata.thisResourceSet())[0]
+    }
+    catch (e) {
+        console.log(e)
+        console.log(jsondata)
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ocurrió un error al intentar obtener los datos' })
+        return
+    }
 
-    // let laborPromiseArray = []
-    // for (let i = 0; i < jobPlan.joblabor.length; i++) {
-    //     let labor = maximo.resourceobject("REP_LABOR")
-    //         .select(["*"])
-    //         .where("laborid").in([jobPlan.joblabor[i].joblaborid])
-    //         .fetch()
-    //     laborPromiseArray.push(labor)        
-    // }
-
-    // let laborResults = await Promise.all(laborPromiseArray)
-    // for (let i = 0; i < laborResults.length; i++) {
-    //     let labor = (laborResults[i].thisResourceSet())[0]
-    //     jobPlan[i].jobPlan = jobPlan
-    // }
     sendJSONresponse(res, 200, { status: 'OK', payload: jobPlan })
     return
 }
 
-module.exports.getWorkOrderWithPlans = async (req, res) => {
+module.exports.getWorkOrder = async (req, res) => {
     const user = req.user.user
     const password = req.user.password
     const wonum = req.params.wonum
@@ -226,13 +230,122 @@ module.exports.getWorkOrderWithPlans = async (req, res) => {
         islean: 1
     }
 
+    // with actual
     const maximo = new Maximo(options)
-    let jsondata = await maximo.resourceobject("MXWODETAIL")
-        .select(["*", "wpmaterial"])
+    // let jsondata = await maximo.resourceobject("MXAPIWODETAIL") // MXWODETAIL
+    //     .select(["*"])
+    //     .where("wonum").in([wonum])
+    //     .fetch()
+
+    // let woActual = (jsondata.thisResourceSet())[0]
+
+    // // with plans
+    // jsondata = await maximo.resourceobject("MXWODETAIL") // with plans
+    //     .select(["*"])
+    //     .where("wonum").in([wonum])
+    //     .fetch()
+
+    // let woPlans = (jsondata.thisResourceSet())[0]
+
+    let woActualJson = maximo.resourceobject("MXAPIWODETAIL") // MXWODETAIL
+        .select(["*"])
         .where("wonum").in([wonum])
         .fetch()
+    let woPlansJson = maximo.resourceobject("MXWODETAIL") // with plans
+        .select(["*"])
+        .where("wonum").in([wonum])
+        .fetch()
+    
 
-    let wo = (jsondata.thisResourceSet())[0]
+    const response = await Promise.all([woActualJson, woPlansJson])
+    let woActual = (response[0].thisResourceSet())[0]
+    let woPlans = (response[1].thisResourceSet())[0]
+    let wo = {
+        ...woActual,
+        ...woPlans,
+    }
     sendJSONresponse(res, 200, { status: 'OK', payload: wo })
+    return
+}
+
+module.exports.getLocation = async (req, res) => {
+    const user = req.user.user
+    const password = req.user.password
+    const location = req.params.location
+
+    if (!user || !password || !location) {
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ingresa todos los campos requeridos' })
+        return
+    }
+
+    const options = {
+        protocol: 'https',
+        hostname: process.env.MAXIMO_HOSTNAME,
+        port: process.env.MAXIMO_PORT,
+        user: user,
+        password: password,
+        auth_scheme: '/maximo',
+        authtype: 'maxauth',
+        islean: 1
+    }
+
+    const maximo = new Maximo(options)
+    let jsondata = await maximo.resourceobject("MXAPILOCATION")
+        .select(["*"])
+        .where("location").in([location])
+        .fetch()
+
+    let locationResponse
+    try {
+        locationResponse = (jsondata.thisResourceSet())[0]
+    }
+    catch (e) {
+        console.log(e)
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ocurrió un error al intentar obtener los datos' })
+        return
+    }
+
+    sendJSONresponse(res, 200, { status: 'OK', payload: locationResponse })
+    return
+}
+
+module.exports.getLabor = async (req, res) => {
+    const user = req.user.user
+    const password = req.user.password
+    const laborcode = req.params.laborcode
+
+    if (!user || !password || !laborcode) {
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ingresa todos los campos requeridos' })
+        return
+    }
+
+    const options = {
+        protocol: 'https',
+        hostname: process.env.MAXIMO_HOSTNAME,
+        port: process.env.MAXIMO_PORT,
+        user: user,
+        password: password,
+        auth_scheme: '/maximo',
+        authtype: 'maxauth',
+        islean: 1
+    }
+
+    const maximo = new Maximo(options)
+    let jsondata = await maximo.resourceobject("MXAPILABOR")
+        .select(["*"])
+        .where("laborcode").in([laborcode])
+        .fetch()
+    console.log(jsondata)
+    let labor
+    try {
+        labor = (jsondata.thisResourceSet())[0]
+    }
+    catch (e) {
+        console.log(e)
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ocurrió un error al intentar obtener los datos' })
+        return
+    }
+
+    sendJSONresponse(res, 200, { status: 'OK', payload: labor })
     return
 }

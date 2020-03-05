@@ -10,9 +10,11 @@ const testController = require('../controllers/test')
 
 router.post('/authentication', maximoController.authentication)
 router.get('/workOrders', auth, maximoController.getWorkOrders)
-router.get('/workOrderWithPlans/:wonum', auth, maximoController.getWorkOrderWithPlans)
+router.get('/workOrder/:wonum', auth, maximoController.getWorkOrder)
 router.get('/asset/:assetnum', auth, maximoController.getAsset)
 router.get('/jobPlan/:jpnum', auth, maximoController.getJobPlan)
+router.get('/location/:location', auth, maximoController.getLocation)
+router.get('/labor/:laborcode', auth, maximoController.getLabor)
 router.get('/test', auth, testController.test)
 
 module.exports = router
