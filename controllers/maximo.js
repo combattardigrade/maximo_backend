@@ -256,7 +256,7 @@ module.exports.getWorkOrder = async (req, res) => {
         .select(["*"])
         .where("wonum").in([wonum])
         .fetch()
-    
+
 
     const response = await Promise.all([woActualJson, woPlansJson])
     let woActual = (response[0].thisResourceSet())[0]
@@ -353,9 +353,9 @@ module.exports.getLabor = async (req, res) => {
 
 module.exports.getWhoAmI = async (req, res) => {
     const user = req.user.user
-    const password = req.user.password   
+    const password = req.user.password
 
-    if (!user || !password ) {
+    if (!user || !password) {
         sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ingresa todos los campos requeridos' })
         return
     }
@@ -363,12 +363,111 @@ module.exports.getWhoAmI = async (req, res) => {
     let response = await rp('https://' + process.env.MAXIMO_HOSTNAME + `/maximo/oslc/whoami?_lid=${user}&_lpwd=${password}`)
     response = JSON.parse(response)
 
-    if(!response ) {
+    if (!response) {
         console.log(response)
-        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ocurrió un error al intentar obtener los datos'})
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ocurrió un error al intentar obtener los datos' })
         return
     }
 
     sendJSONresponse(res, 200, { status: 'OK', payload: response })
     return
+}
+
+module.exports.getAssets = async (req, res) => {
+    const user = req.user.user
+    const password = req.user.password
+
+    if (!user || !password) {
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Inicia sesión para realizar la operación' })
+        return
+    }
+
+    const options = {
+        protocol: 'https',
+        hostname: process.env.MAXIMO_HOSTNAME,
+        port: process.env.MAXIMO_PORT,
+        user: user,
+        password: password,
+        auth_scheme: '/maximo',
+        authtype: 'maxauth',
+        islean: 1
+    }
+
+    const maximo = new Maximo(options)
+    let resourceset
+
+    try {
+
+        resourceset = await maximo.resourceobject("MXAPIASSET")
+            .select(["*"])
+            .pagesize(50)
+            .fetch()
+
+        if (resourceset) {
+            let assets = resourceset.thisResourceSet()
+            sendJSONresponse(res, 200, { status: 'OK', payload: assets })
+            return
+        }
+    }
+    catch (err) {
+        console.log(err)
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ocurrió un error al intentar obtener los datos' })
+        return
+    }
+
+}
+
+module.exports.findAsset = async (req, res) => {
+    const user = req.user.user
+    const password = req.user.password
+    const method = req.body.method
+    const value = req.body.value    
+
+    if (!user || !password || !method || !value) {
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Inicia sesión para realizar la operación' })
+        return
+    }
+
+    const options = {
+        protocol: 'https',
+        hostname: process.env.MAXIMO_HOSTNAME,
+        port: process.env.MAXIMO_PORT,
+        user: user,
+        password: password,
+        auth_scheme: '/maximo',
+        authtype: 'maxauth',
+        islean: 1
+    }
+
+    const maximo = new Maximo(options)
+    let resourceset
+
+    try {
+
+        if (method == 'assetnum') {
+            resourceset = await maximo.resourceobject("MXAPIASSET")
+                .select(["*"])
+                .where("assetnum").in([value])
+                .pagesize(50)
+                .fetch()
+        } else if (method == 'location') {            
+            resourceset = await maximo.resourceobject("MXAPIASSET")
+                .select(["*"])
+                .where("location").in([value])
+                .pagesize(50)
+                .fetch()
+        }
+
+        if (resourceset) {
+            let assets = resourceset.thisResourceSet()            
+            sendJSONresponse(res, 200, { status: 'OK', payload: assets })
+            return
+        }
+    }
+    catch (err) {
+        console.log(err)
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ocurrió un error al intentar obtener los datos' })
+        return
+    }
+
 }

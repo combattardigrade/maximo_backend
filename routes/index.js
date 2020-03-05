@@ -16,6 +16,8 @@ router.get('/jobPlan/:jpnum', auth, maximoController.getJobPlan)
 router.get('/location/:location', auth, maximoController.getLocation)
 router.get('/labor/:laborcode', auth, maximoController.getLabor)
 router.get('/whoami', auth, maximoController.getWhoAmI)
+router.get('/assets', auth, maximoController.getAssets)
+router.post('/findAsset', auth, maximoController.findAsset)
 router.get('/test', auth, testController.test)
 
 module.exports = router
