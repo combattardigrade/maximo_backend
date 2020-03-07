@@ -421,7 +421,7 @@ module.exports.findAsset = async (req, res) => {
     const user = req.user.user
     const password = req.user.password
     const method = req.body.method
-    const value = req.body.value    
+    const value = req.body.value
 
     if (!user || !password || !method || !value) {
         sendJSONresponse(res, 404, { status: 'ERROR', message: 'Inicia sesión para realizar la operación' })
@@ -450,7 +450,7 @@ module.exports.findAsset = async (req, res) => {
                 .where("assetnum").in([value])
                 .pagesize(50)
                 .fetch()
-        } else if (method == 'location') {            
+        } else if (method == 'location') {
             resourceset = await maximo.resourceobject("MXAPIASSET")
                 .select(["*"])
                 .where("location").in([value])
@@ -459,8 +459,143 @@ module.exports.findAsset = async (req, res) => {
         }
 
         if (resourceset) {
-            let assets = resourceset.thisResourceSet()            
+            let assets = resourceset.thisResourceSet()
             sendJSONresponse(res, 200, { status: 'OK', payload: assets })
+            return
+        }
+    }
+    catch (err) {
+        console.log(err)
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ocurrió un error al intentar obtener los datos' })
+        return
+    }
+
+}
+
+module.exports.getInventory = async (req, res) => {
+    const user = req.user.user
+    const password = req.user.password
+
+    if (!user || !password) {
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Inicia sesión para realizar la operación' })
+        return
+    }
+
+    const options = {
+        protocol: 'https',
+        hostname: process.env.MAXIMO_HOSTNAME,
+        port: process.env.MAXIMO_PORT,
+        user: user,
+        password: password,
+        auth_scheme: '/maximo',
+        authtype: 'maxauth',
+        islean: 1
+    }
+
+    const maximo = new Maximo(options)
+    let resourceset
+
+    try {
+
+        resourceset = await maximo.resourceobject("MXINVENTORY") // MXITEM ?
+            .select(["*"])
+            .pagesize(20)
+            .fetch()
+
+        if (resourceset) {
+            let inventory = resourceset.thisResourceSet()
+            let itemsPromiseArray = []
+
+            for (let i = 0; i < inventory.length; i++) {
+                let item = maximo.resourceobject("MXITEM")
+                    .select(["*"])
+                    .where("itemnum").in([inventory[i].itemnum])
+                    .pagesize(1)
+                    .fetch()
+                itemsPromiseArray.push(item)
+            }
+
+            let items = await Promise.all(itemsPromiseArray)
+
+            for (let i = 0; i < inventory.length; i++) {
+                inventory[i].itemDetails = await (items[i].thisResourceSet())[0]
+            }
+
+
+            sendJSONresponse(res, 200, { status: 'OK', payload: inventory })
+            return
+        }
+    }
+    catch (err) {
+        console.log(err)
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ocurrió un error al intentar obtener los datos' })
+        return
+    }
+
+}
+
+module.exports.findInventoryItem = async (req, res) => {
+    const user = req.user.user
+    const password = req.user.password
+    const method = req.body.method
+    const value = req.body.value
+
+    if (!user || !password || !method || !value) {
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Inicia sesión para realizar la operación' })
+        return
+    }
+
+    const options = {
+        protocol: 'https',
+        hostname: process.env.MAXIMO_HOSTNAME,
+        port: process.env.MAXIMO_PORT,
+        user: user,
+        password: password,
+        auth_scheme: '/maximo',
+        authtype: 'maxauth',
+        islean: 1
+    }
+
+    const maximo = new Maximo(options)
+    let resourceset
+
+    try {
+
+        if (method == 'itemnum') {
+            resourceset = await maximo.resourceobject("MXINVENTORY")
+                .select(["*"])
+                .where("itemnum").in([value])
+                .pagesize(10)
+                .fetch()
+        } else if (method == 'location') {
+            resourceset = await maximo.resourceobject("MXINVENTORY")
+                .select(["*"])
+                .where("location").in([value])
+                .pagesize(10)
+                .fetch()
+        }
+
+        if (resourceset) {
+            let inventory = resourceset.thisResourceSet()
+            let itemsPromiseArray = []
+
+            for (let i = 0; i < inventory.length; i++) {
+                let item = maximo.resourceobject("MXITEM")
+                    .select(["*"])
+                    .where("itemnum").in([inventory[i].itemnum])
+                    .pagesize(1)
+                    .fetch()
+                itemsPromiseArray.push(item)
+            }
+
+            let items = await Promise.all(itemsPromiseArray)
+
+            for (let i = 0; i < inventory.length; i++) {
+                inventory[i].itemDetails = await (items[i].thisResourceSet())[0]
+            }
+
+
+            sendJSONresponse(res, 200, { status: 'OK', payload: inventory })
             return
         }
     }
