@@ -445,13 +445,13 @@ module.exports.findAsset = async (req, res) => {
     try {
 
         if (method == 'assetnum') {
-            resourceset = await maximo.resourceobject("MXAPIASSET")
+            resourceset = await maximo.resourceobject("MXASSET") // MXAPIASSET ?
                 .select(["*"])
                 .where("assetnum").in([value])
                 .pagesize(50)
                 .fetch()
         } else if (method == 'location') {
-            resourceset = await maximo.resourceobject("MXAPIASSET")
+            resourceset = await maximo.resourceobject("MXASSET") // MXAPIASSET ?
                 .select(["*"])
                 .where("location").in([value])
                 .pagesize(50)
