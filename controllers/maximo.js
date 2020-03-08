@@ -1,6 +1,9 @@
 const Maximo = require('ibm-maximo-api')
 const jwt = require('jsonwebtoken')
 const rp = require('request-promise')
+const https = require('https')
+const xml2js = require('xml2js')
+const parser = new xml2js.Parser({ attrkey: "ATTR" })
 
 
 sendJSONresponse = function (res, status, content) {
@@ -258,12 +261,28 @@ module.exports.getWorkOrder = async (req, res) => {
         .fetch()
 
 
-    const response = await Promise.all([woActualJson, woPlansJson])
+
+    let response = await Promise.all([woActualJson, woPlansJson])
     let woActual = (response[0].thisResourceSet())[0]
     let woPlans = (response[1].thisResourceSet())[0]
+
+    let asset = maximo.resourceobject("MXAPIASSET")
+        .select(["description"])
+        .where("assetnum").in([woActual.assetnum])
+        .fetch()
+    let location = maximo.resourceobject("MXAPILOCATION")
+        .select(["locations.description"])
+        .where("location").in([woActual.location])
+        .fetch()
+    response = await Promise.all([asset, location])
+    asset = (response[0].thisResourceSet())[0]
+    location = (response[1].thisResourceSet())[0]
+
     let wo = {
         ...woActual,
         ...woPlans,
+        assetDescription: asset.description,
+        locationDetails: location
     }
     sendJSONresponse(res, 200, { status: 'OK', payload: wo })
     return
@@ -417,6 +436,34 @@ module.exports.getAssets = async (req, res) => {
 
 }
 
+function getMBO(params) {
+    const url = `https://${process.env.MAXIMO_HOSTNAME}/maxrest/rest/mbo/${params.mbo}?${params.searchParam}=${params.searchValue}&_lid=${params.user}&_lpwd=${params.password}`
+    return new Promise(function (resolve, reject) {
+        try {
+            https.get(url, function (res) {
+                let data = ''
+                res.on('data', function (stream) {
+                    data += stream
+                });
+                res.on('end', function () {
+                    parser.parseString(data, function (error, result) {
+                        if (error === null) {
+                            resolve(result)
+                        }
+                        else {
+                            reject(error)
+                        }
+                    })
+                })
+            })
+        }
+        catch (err) {
+            console.log(err)
+            reject(err)
+        }
+    })
+}
+
 module.exports.findAsset = async (req, res) => {
     const user = req.user.user
     const password = req.user.password
@@ -459,8 +506,11 @@ module.exports.findAsset = async (req, res) => {
         }
 
         if (resourceset) {
-            let assets = resourceset.thisResourceSet()
-            sendJSONresponse(res, 200, { status: 'OK', payload: assets })
+            let asset = resourceset.thisResourceSet()
+
+            // Get
+            //console.log(hazardId)
+            sendJSONresponse(res, 200, { status: 'OK', payload: asset })
             return
         }
     }
@@ -470,6 +520,127 @@ module.exports.findAsset = async (req, res) => {
         return
     }
 
+}
+
+module.exports.getAssetSafetyData = async (req, res) => {
+    const user = req.user.user
+    const password = req.user.password
+    const assetnum = req.params.assetnum
+
+    if (!user || !password || !assetnum) {
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ingresa todos los campos requeridos' })
+        return
+    }
+
+    try {
+        // Get HazardId     
+        let mbo = await getMBO({ user, password, mbo: 'safetylexicon', searchParam: 'assetnum', searchValue: assetnum })
+        let hazards
+        try {
+            hazards = mbo.SAFETYLEXICONMboSet.SAFETYLEXICON[0].HAZARDID
+        }
+        catch (e) {
+            sendJSONresponse(res, 200, { status: 'OK', payload: [] })
+            return
+        }
+        const hazardsArray = []
+        for (let hazardId of hazards) {
+            // Get Hazard Details
+            mbo = await getMBO({ user, password, mbo: 'hazard', searchParam: 'hazardid', searchValue: hazardId })
+            const hazard = mbo.HAZARDMboSet.HAZARD[0]
+
+
+            // Get Precaution
+            mbo = await getMBO({ user, password, mbo: 'hazardprec', searchParam: 'hazardid', searchValue: hazardId })
+            const precaution = mbo.HAZARDPRECMboSet.HAZARDPREC[0]
+
+            const hazardSafety = {
+                hazardId,
+                hazardDescription: hazard.DESCRIPTION,
+                precautionId: precaution.PRECAUTIONID,
+                precautionDescription: precaution.DESCRIPTION
+            }
+
+            hazardsArray.push(hazardSafety)
+        }
+
+        sendJSONresponse(res, 200, { status: 'OK', payload: hazardsArray })
+        return
+    }
+    catch (err) {
+        console.log(err)
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ocurrió un erro al intentar obtener la información' })
+    }
+}
+
+module.exports.getWOSafetyData = async (req, res) => {
+    const user = req.user.user
+    const password = req.user.password
+    const wonum = req.params.wonum
+
+    if (!user || !password || !wonum) {
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ingresa todos los campos requeridos' })
+        return
+    }
+
+    try {
+        // Get HazardId     
+        let mbo = await getMBO({ user, password, mbo: 'safetylexicon', searchParam: 'wonum', searchValue: wonum })
+        let hazards
+        try {
+            hazards = mbo.SAFETYLEXICONMboSet.SAFETYLEXICON
+
+        }
+        catch (e) {
+            sendJSONresponse(res, 200, { status: 'OK', payload: [] })
+            return
+        }
+
+        const hazardsArray = []
+        const uniqueIds = []
+
+        for (let i = 0; i < hazards.length; i++) {
+
+            let hazardId
+
+            try {
+                // HazardId
+                hazardId = hazards[i].HAZARDID[0]
+                if(uniqueIds.includes(hazardId)) {
+                    continue;
+                }
+                uniqueIds.push(hazardId)
+            }
+            catch (e) {                
+                break;
+            }
+
+            // Get Hazard Details
+            mbo = await getMBO({ user, password, mbo: 'hazard', searchParam: 'hazardid', searchValue: hazardId })
+            let hazard = mbo.HAZARDMboSet.HAZARD[0]
+
+            // Get Precaution
+            mbo = await getMBO({ user, password, mbo: 'hazardprec', searchParam: 'hazardid', searchValue: hazardId })
+            let precaution = mbo.HAZARDPRECMboSet.HAZARDPREC[0]     
+
+            const hazardSafety = {
+                hazardId,
+                hazardDescription: hazard.DESCRIPTION[0],
+                precautionId: precaution.PRECAUTIONID[0],
+                precautionDescription: precaution.DESCRIPTION[0]
+            }
+
+            hazardsArray.push(hazardSafety)
+        }
+  
+
+        sendJSONresponse(res, 200, { status: 'OK', payload: hazardsArray })
+        return
+    }
+    catch (err) {
+        console.log(err)
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ocurrió un erro al intentar obtener la información' })
+    }
 }
 
 module.exports.getInventory = async (req, res) => {

@@ -23,7 +23,7 @@
     "express-recaptcha": "4.1.1",
     "firebase-admin": "^8.7.0",
     "http": "0.0.0",
-    "https": "1.0.0",
+    "https": "^1.0.0",
     "ibm-maximo-api": "^1.0.15",
     "jade": "1.11.0",
     "jsonwebtoken": "8.4.0",
@@ -39,7 +39,8 @@
     "request-promise": "^4.2.4",
     "sequelize": "4.42.0",
     "serve-favicon": "2.5.0",
-    "socket.io": "2.2.0"
+    "socket.io": "2.2.0",
+    "xml2js": "^0.4.23"
   },
   "devDependencies": {
     "nodemon": "1.18.10"
