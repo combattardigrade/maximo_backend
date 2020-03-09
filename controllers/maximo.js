@@ -606,12 +606,12 @@ module.exports.getWOSafetyData = async (req, res) => {
             try {
                 // HazardId
                 hazardId = hazards[i].HAZARDID[0]
-                if(uniqueIds.includes(hazardId)) {
+                if (uniqueIds.includes(hazardId)) {
                     continue;
                 }
                 uniqueIds.push(hazardId)
             }
-            catch (e) {                
+            catch (e) {
                 break;
             }
 
@@ -621,7 +621,7 @@ module.exports.getWOSafetyData = async (req, res) => {
 
             // Get Precaution
             mbo = await getMBO({ user, password, mbo: 'hazardprec', searchParam: 'hazardid', searchValue: hazardId })
-            let precaution = mbo.HAZARDPRECMboSet.HAZARDPREC[0]     
+            let precaution = mbo.HAZARDPRECMboSet.HAZARDPREC[0]
 
             const hazardSafety = {
                 hazardId,
@@ -632,7 +632,7 @@ module.exports.getWOSafetyData = async (req, res) => {
 
             hazardsArray.push(hazardSafety)
         }
-  
+
 
         sendJSONresponse(res, 200, { status: 'OK', payload: hazardsArray })
         return
@@ -776,4 +776,97 @@ module.exports.findInventoryItem = async (req, res) => {
         return
     }
 
+}
+
+module.exports.updateTaskStatus = async (req, res) => {
+    const user = req.user.user
+    const password = req.user.password
+    const wonum = req.body.wonum
+    const taskid = req.body.taskid
+    const status = req.body.status
+    const rdb_abount = 'https://maximo-demo76.mro.com:443/maximo/oslc/os/mxwodetail/_QkVERk9SRC8xNTMx'
+
+    if (!user || !password || !wonum || !taskid || !status) {
+        sendJSONresponse(res, 422, { status: 'ERROR', message: 'Ingresa todos los campos requeridos' })
+        return
+    }
+
+    //const url = `https://${process.env.MAXIMO_HOSTNAME}/maxrest/rest/mbo/${params.mbo}?${params.searchParam}=${params.searchValue}&_lid=${params.user}&_lpwd=${params.password}`
+
+
+
+    const options = {
+        protocol: 'https',
+        hostname: process.env.MAXIMO_HOSTNAME,
+        port: process.env.MAXIMO_PORT,
+        user: user,
+        password: password,
+        auth_scheme: '/maximo',
+        authtype: 'maxauth',
+        islean: 1
+    }
+
+    const maximo = new Maximo(options)
+    // let wo = await maximo.resourceobject("mxapiwodetail")
+    //     .select(["woactivity"])
+    //     .where("wonum").in([wonum])
+    //     .pagesize(1)
+    //     .fetch()
+
+    // wo = wo.thisResourceSet()
+
+    // maximo.resourceobject('MXWODETAIL')
+    //     .resource(rdb_abount)
+    //     .update({'spi:status':'APPR'}, ['spi:status'])
+    //     .then((resource) => {
+    //         console.log(resource)
+    //         var jsondata = resource.JSON();
+    //         sendJSONresponse(res, 200, {status: 'OK', payload: jsondata})
+    //     })
+    //     .fail((err) => {
+    //         console.log(err)
+    //     })
+
+    async function updateWO(params) {
+        // https://maximo-demo76.mro.com:443/maximo/oslc/os/mxwodetail/_QkVERk9SRC8xNTMx
+
+        const auth = Buffer.from('maximo:maxpass1').toString('base64')
+        console.log(auth)
+
+        let response = await rp({
+            uri: `https://${process.env.MAXIMO_HOSTNAME}/maximo/oslc/os/mxwo/_QkVERk9SRC8xNTMx?_lid=maximo&_lpwd=maxpass1`,
+            method: 'POST',
+            body: {
+                'spi:status': 'COMP'
+            },
+            headers: {
+                'Authorization': auth,
+                'x-method-override': 'PATCH',
+                'properties': '*',
+
+            },
+            json: true
+        })
+        console.log(response)
+        sendJSONresponse(res, 200, { status: 'OK', payload: response })
+    }
+
+    await updateWO({
+        mbo: 'MXWO',
+        searchParam: 'wonum',
+        searchValue: '_QkVERk9SRC8xNTMx',
+        user,
+        password,
+
+    })
+
+    // .resource(req.session.myresourceset[0]["rdf:about"]) //Pass the URI
+    // .update(updates, ["spi:wonum", "spi:description"])
+    // .then(function (resource) {
+    //     var jsondata = resource.JSON();
+    //     res.json(jsondata);
+    // })
+    // .fail(function (error) {
+    //     console.log('****** Error Code = ' + error);
+    // });
 }

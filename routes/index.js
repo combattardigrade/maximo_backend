@@ -22,6 +22,10 @@ router.get('/assetSafety/:assetnum', auth, maximoController.getAssetSafetyData)
 router.get('/woSafety/:wonum', auth, maximoController.getWOSafetyData)
 router.get('/inventory', auth, maximoController.getInventory)
 router.post('/findInventoryItem', auth, maximoController.findInventoryItem)
+
+router.post('/task/updateStatus', auth, maximoController.updateTaskStatus)
+
+
 router.get('/test', auth, testController.test)
 
 module.exports = router
