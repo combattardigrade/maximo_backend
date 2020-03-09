@@ -854,11 +854,8 @@ module.exports.updateTaskStatus = async (req, res) => {
         let response = await rp({
                 uri: `https://${process.env.MAXIMO_HOSTNAME}/maximo/oslc/os/mxapiwodetail/_QkVERk9SRC8xNTMz?_lid=maximo&_lpwd=maxpass1`,
                 method: 'POST',
-                body: {
-                    // 'spi:status': 'APPR',
-                    'spi:woactivity': [{
-                        // 'spi:taskid': 123223,
-                        // "spi:parent": 1533,
+                body: {                    
+                    'spi:woactivity': [{                        
                         'spi:href': 'http://childkey#V09SS09SREVSL1dPQUNUSVZJVFkvQkVERk9SRC9UMTQ3OQ--',
                         'spi:status': 'INPRG'
                     }]
