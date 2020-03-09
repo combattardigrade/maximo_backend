@@ -781,115 +781,54 @@ module.exports.findInventoryItem = async (req, res) => {
 module.exports.updateTaskStatus = async (req, res) => {
     const user = req.user.user
     const password = req.user.password
-    const wonum = req.body.wonum
-    const taskid = req.body.taskid
+    let woHref = req.body.woHref
+    const taskHref = req.body.taskHref
     const status = req.body.status
-    const rdb_abount = 'https://maximo-demo76.mro.com:443/maximo/oslc/os/mxwodetail/_QkVERk9SRC8xNTMx'
-
-    if (!user || !password || !wonum || !taskid || !status) {
+    
+    if (!user || !password || !woHref || !taskHref || !status) {
         sendJSONresponse(res, 422, { status: 'ERROR', message: 'Ingresa todos los campos requeridos' })
         return
     }
 
-    //const url = `https://${process.env.MAXIMO_HOSTNAME}/maxrest/rest/mbo/${params.mbo}?${params.searchParam}=${params.searchValue}&_lid=${params.user}&_lpwd=${params.password}`
+    woHref = woHref.split('/')
+    woHref = woHref[woHref.length - 1]
 
+    // Creating and updating resoruces
+    // https://developer.ibm.com/static/site-id/155/maximodev/restguide/Maximo_Nextgen_REST_API.html#_creating_and_updating_resources
+    
+    
+    let response = await rp({
+        uri: `https://${process.env.MAXIMO_HOSTNAME}/maximo/oslc/os/mxapiwodetail/${woHref}?_lid=${user}&_lpwd=${password}`,
+        method: 'POST',
+        body: {
+            'spi:woactivity': [{
+                'rdf:about': taskHref,
+                'spi:status': status
+            }]
+        },
+        headers: {            
+            'x-method-override': 'PATCH',
+            'patchtype': 'MERGE',
+            'properties': 'spi:woactivity',
 
-
-    const options = {
-        protocol: 'https',
-        hostname: process.env.MAXIMO_HOSTNAME,
-        port: process.env.MAXIMO_PORT,
-        user: user,
-        password: password,
-        auth_scheme: '/maximo',
-        authtype: 'maxauth',
-        islean: 1
-    }
-
-    const maximo = new Maximo(options)
-    // let wo = await maximo.resourceobject("mxapiwodetail")
-    //     .select(["woactivity"])
-    //     .where("wonum").in([wonum])
-    //     .pagesize(1)
-    //     .fetch()
-
-    // wo = wo.thisResourceSet()
-
-    // maximo.resourceobject('MXWODETAIL')
-    //     .resource(rdb_abount)
-    //     .update({'spi:status':'APPR'}, ['spi:status'])
-    //     .then((resource) => {
-    //         console.log(resource)
-    //         var jsondata = resource.JSON();
-    //         sendJSONresponse(res, 200, {status: 'OK', payload: jsondata})
-    //     })
-    //     .fail((err) => {
-    //         console.log(err)
-    //     })
-
-    async function updateWO(params) {
-        // https://maximo-demo76.mro.com:443/maximo/oslc/os/mxwodetail/_QkVERk9SRC8xNTMx
-
-        const auth = Buffer.from('maximo:maxpass1').toString('base64')
-        console.log(auth)
-
-        // let response = await rp({
-        //     uri: `https://${process.env.MAXIMO_HOSTNAME}/maximo/oslc/os/mxwo/_QkVERk9SRC8xNTMx?_lid=maximo&_lpwd=maxpass1`,
-        //     method: 'POST',
-        //     body: {
-        //         'spi:status': 'COMP'
-        //     },
-        //     headers: {
-        //         'Authorization': auth,
-        //         'x-method-override': 'PATCH',
-        //         'properties': '*',
-
-        //     },
-        //     json: true
-        // })
-        // Creating and updating resoruces
-        // https://developer.ibm.com/static/site-id/155/maximodev/restguide/Maximo_Nextgen_REST_API.html#_creating_and_updating_resources
-
-
-        let response = await rp({
-                uri: `https://${process.env.MAXIMO_HOSTNAME}/maximo/oslc/os/mxapiwodetail/_QkVERk9SRC8xNTMz?_lid=maximo&_lpwd=maxpass1`,
-                method: 'POST',
-                body: {                    
-                    'spi:woactivity': [{                        
-                        'spi:href': 'http://childkey#V09SS09SREVSL1dPQUNUSVZJVFkvQkVERk9SRC9UMTQ3OQ--',
-                        'spi:status': 'INPRG'
-                    }]
-                },
-                headers: {
-                    'Authorization': auth,
-                    'x-method-override': 'PATCH',
-                    'patchtype': 'MERGE',
-                    'properties': '*',
-
-                },
-                json: true
-        })
-
-        console.log(response)
-        sendJSONresponse(res, 200, { status: 'OK', payload: response })
-    }
-
-    await updateWO({
-        mbo: 'MXWO',
-        searchParam: 'wonum',
-        searchValue: '_QkVERk9SRC8xNTMx',
-        user,
-        password,
-
+        },
+        json: true
     })
+    
+    sendJSONresponse(res, 200, { status: 'OK', payload: response })    
+    return
+    // let response = await rp({
+    //     uri: `https://${process.env.MAXIMO_HOSTNAME}/maximo/oslc/os/mxwo/_QkVERk9SRC8xNTMx?_lid=maximo&_lpwd=maxpass1`,
+    //     method: 'POST',
+    //     body: {
+    //         'spi:status': 'COMP'
+    //     },
+    //     headers: {
+    //         'Authorization': auth,
+    //         'x-method-override': 'PATCH',
+    //         'properties': '*',
 
-    // .resource(req.session.myresourceset[0]["rdf:about"]) //Pass the URI
-    // .update(updates, ["spi:wonum", "spi:description"])
-    // .then(function (resource) {
-    //     var jsondata = resource.JSON();
-    //     res.json(jsondata);
+    //     },
+    //     json: true
     // })
-    // .fail(function (error) {
-    //     console.log('****** Error Code = ' + error);
-    // });
 }
