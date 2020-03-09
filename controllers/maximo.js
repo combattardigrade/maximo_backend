@@ -236,20 +236,6 @@ module.exports.getWorkOrder = async (req, res) => {
 
     // with actual
     const maximo = new Maximo(options)
-    // let jsondata = await maximo.resourceobject("MXAPIWODETAIL") // MXWODETAIL
-    //     .select(["*"])
-    //     .where("wonum").in([wonum])
-    //     .fetch()
-
-    // let woActual = (jsondata.thisResourceSet())[0]
-
-    // // with plans
-    // jsondata = await maximo.resourceobject("MXWODETAIL") // with plans
-    //     .select(["*"])
-    //     .where("wonum").in([wonum])
-    //     .fetch()
-
-    // let woPlans = (jsondata.thisResourceSet())[0]
 
     let woActualJson = maximo.resourceobject("MXAPIWODETAIL") // MXWODETAIL
         .select(["*"])
@@ -265,6 +251,38 @@ module.exports.getWorkOrder = async (req, res) => {
     let response = await Promise.all([woActualJson, woPlansJson])
     let woActual = (response[0].thisResourceSet())[0]
     let woPlans = (response[1].thisResourceSet())[0]
+
+    try {
+        // Get completed hrs
+        for (let i = 0; i < woActual.wplabor.length; i++) {
+            let taskid = woActual.wplabor[i].taskid
+            let laborhrscompleted = 0
+            for (let j = 0; j < woActual.labtrans.length; j++) {
+                if (taskid != woActual.labtrans[j].taskid) continue
+                laborhrscompleted += parseInt(woActual.labtrans[j].regularhrs)
+            }
+            woActual.wplabor[i].laborhrscompleted = laborhrscompleted
+        }
+    }
+    catch(e) {
+        console.log('Error getting completed hrs')
+    }
+    
+    try {
+        // Get used materials
+        for(let i = 0; i < woActual.wpmaterial.length; i++) {
+            let itemnum = woActual.wpmaterial[i].itemnum
+            let itemqtyused = 0
+            for(let j = 0; j < woActual.matusetrans.length; j++) {
+                if(itemnum != woActual.matusetrans[j].itemnum) continue
+                itemqtyused += parseInt(woActual.matusetrans[j].quantity) * -1
+            }
+            woActual.wpmaterial[i].itemqtyused = itemqtyused
+        }
+    }
+    catch(e) {
+        console.log('Error getting used materials')
+    }
 
     let asset = maximo.resourceobject("MXAPIASSET")
         .select(["description"])
@@ -784,7 +802,7 @@ module.exports.updateTaskStatus = async (req, res) => {
     let woHref = req.body.woHref
     const taskHref = req.body.taskHref
     const status = req.body.status
-    
+
     if (!user || !password || !woHref || !taskHref || !status) {
         sendJSONresponse(res, 422, { status: 'ERROR', message: 'Ingresa todos los campos requeridos' })
         return
@@ -795,8 +813,8 @@ module.exports.updateTaskStatus = async (req, res) => {
 
     // Creating and updating resoruces
     // https://developer.ibm.com/static/site-id/155/maximodev/restguide/Maximo_Nextgen_REST_API.html#_creating_and_updating_resources
-    
-    
+
+
     let response = await rp({
         uri: `https://${process.env.MAXIMO_HOSTNAME}/maximo/oslc/os/mxapiwodetail/${woHref}?_lid=${user}&_lpwd=${password}`,
         method: 'POST',
@@ -806,7 +824,7 @@ module.exports.updateTaskStatus = async (req, res) => {
                 'spi:status': status
             }]
         },
-        headers: {            
+        headers: {
             'x-method-override': 'PATCH',
             'patchtype': 'MERGE',
             'properties': 'spi:woactivity',
@@ -814,8 +832,8 @@ module.exports.updateTaskStatus = async (req, res) => {
         },
         json: true
     })
-    
-    sendJSONresponse(res, 200, { status: 'OK', payload: response })    
+
+    sendJSONresponse(res, 200, { status: 'OK', payload: response })
     return
     // let response = await rp({
     //     uri: `https://${process.env.MAXIMO_HOSTNAME}/maximo/oslc/os/mxwo/_QkVERk9SRC8xNTMx?_lid=maximo&_lpwd=maxpass1`,
