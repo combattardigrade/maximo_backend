@@ -281,7 +281,7 @@ module.exports.getWorkOrder = async (req, res) => {
     let wo = {
         ...woActual,
         ...woPlans,
-        assetDescription: asset.description,
+        assetDescription: asset && asset.description,
         locationDetails: location
     }
     sendJSONresponse(res, 200, { status: 'OK', payload: wo })
@@ -833,20 +833,46 @@ module.exports.updateTaskStatus = async (req, res) => {
         const auth = Buffer.from('maximo:maxpass1').toString('base64')
         console.log(auth)
 
-        let response = await rp({
-            uri: `https://${process.env.MAXIMO_HOSTNAME}/maximo/oslc/os/mxwo/_QkVERk9SRC8xNTMx?_lid=maximo&_lpwd=maxpass1`,
-            method: 'POST',
-            body: {
-                'spi:status': 'COMP'
-            },
-            headers: {
-                'Authorization': auth,
-                'x-method-override': 'PATCH',
-                'properties': '*',
+        // let response = await rp({
+        //     uri: `https://${process.env.MAXIMO_HOSTNAME}/maximo/oslc/os/mxwo/_QkVERk9SRC8xNTMx?_lid=maximo&_lpwd=maxpass1`,
+        //     method: 'POST',
+        //     body: {
+        //         'spi:status': 'COMP'
+        //     },
+        //     headers: {
+        //         'Authorization': auth,
+        //         'x-method-override': 'PATCH',
+        //         'properties': '*',
 
-            },
-            json: true
+        //     },
+        //     json: true
+        // })
+        // Creating and updating resoruces
+        // https://developer.ibm.com/static/site-id/155/maximodev/restguide/Maximo_Nextgen_REST_API.html#_creating_and_updating_resources
+
+
+        let response = await rp({
+                uri: `https://${process.env.MAXIMO_HOSTNAME}/maximo/oslc/os/mxapiwodetail/_QkVERk9SRC8xNTMz?_lid=maximo&_lpwd=maxpass1`,
+                method: 'POST',
+                body: {
+                    // 'spi:status': 'APPR',
+                    'spi:woactivity': [{
+                        // 'spi:taskid': 123223,
+                        // "spi:parent": 1533,
+                        'spi:href': 'http://childkey#V09SS09SREVSL1dPQUNUSVZJVFkvQkVERk9SRC9UMTQ3OQ--',
+                        'spi:status': 'INPRG'
+                    }]
+                },
+                headers: {
+                    'Authorization': auth,
+                    'x-method-override': 'PATCH',
+                    'patchtype': 'MERGE',
+                    'properties': '*',
+
+                },
+                json: true
         })
+
         console.log(response)
         sendJSONresponse(res, 200, { status: 'OK', payload: response })
     }
