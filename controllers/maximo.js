@@ -264,23 +264,23 @@ module.exports.getWorkOrder = async (req, res) => {
             woActual.wplabor[i].laborhrscompleted = laborhrscompleted
         }
     }
-    catch(e) {
+    catch (e) {
         console.log('Error getting completed hrs')
     }
-    
+
     try {
         // Get used materials
-        for(let i = 0; i < woActual.wpmaterial.length; i++) {
+        for (let i = 0; i < woActual.wpmaterial.length; i++) {
             let itemnum = woActual.wpmaterial[i].itemnum
             let itemqtyused = 0
-            for(let j = 0; j < woActual.matusetrans.length; j++) {
-                if(itemnum != woActual.matusetrans[j].itemnum) continue
+            for (let j = 0; j < woActual.matusetrans.length; j++) {
+                if (itemnum != woActual.matusetrans[j].itemnum) continue
                 itemqtyused += parseInt(woActual.matusetrans[j].quantity) * -1
             }
             woActual.wpmaterial[i].itemqtyused = itemqtyused
         }
     }
-    catch(e) {
+    catch (e) {
         console.log('Error getting used materials')
     }
 
@@ -849,4 +849,82 @@ module.exports.updateTaskStatus = async (req, res) => {
     //     },
     //     json: true
     // })
+}
+
+module.exports.findWorkOrder = async (req, res) => {
+    const user = req.user.user
+    const password = req.user.password
+    const method = req.body.method
+    const value = req.body.value
+
+    if (!user || !password || !method || !value) {
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ingresa todos los campos requeridos' })
+        return
+    }
+
+    const options = {
+        protocol: 'https',
+        hostname: process.env.MAXIMO_HOSTNAME,
+        port: process.env.MAXIMO_PORT,
+        user: user,
+        password: password,
+        auth_scheme: '/maximo',
+        authtype: 'maxauth',
+        islean: 1
+    }
+
+    const maximo = new Maximo(options)
+    
+
+    try {
+        let resourceset
+        if (method == 'wonum') {
+            resourceset = await maximo.resourceobject("MXAPIWODETAIL")
+                .select(["wonum", "description", "description_longdescription", "assetnum",
+                    "location", "location.description", "worktype", "wopriority", "gb_abc", "status", "schedstart", "schedfinish",
+                    "supervisor", "reportdate", "estdur", "taskid", "targstartdate", "jobtaskid", "jpnum",])
+                .where("wonum").in([value])
+                .orderby('wonum', 'desc')
+                .pagesize(20)
+                .fetch()
+        } else if (method == 'description') {
+            resourceset = await maximo.resourceobject("MXAPIWODETAIL")
+                .select(["wonum", "description", "description_longdescription", "assetnum",
+                    "location", "location.description", "worktype", "wopriority", "gb_abc", "status", "schedstart", "schedfinish",
+                    "supervisor", "reportdate", "estdur", "taskid", "targstartdate", "jobtaskid", "jpnum",])
+                .where("description").in([value])
+                .orderby('wonum', 'desc')
+                .pagesize(20)
+                .fetch()
+        }
+
+        let workOrders = resourceset.thisResourceSet()
+
+        if (workOrders) {
+            let assetPromiseArray = []
+            
+
+            for (let i = 0; i < workOrders.length; i++) {
+                let asset = maximo.resourceobject("MXAPIASSET")
+                    .select(["wonum", "description"])
+                    .where("assetnum").in([workOrders[i].assetnum])
+                    .fetch()
+                assetPromiseArray.push(asset)               
+            }
+
+            let assetResults = await Promise.all(assetPromiseArray)
+            for (let i = 0; i < workOrders.length; i++) {
+                let asset = (assetResults[i].thisResourceSet())[0]
+                workOrders[i].asset = asset
+            }
+
+            sendJSONresponse(res, 200, { status: 'OK', payload: workOrders })
+            return
+        }
+    }
+    catch (err) {
+        console.log(err)
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ocurrió un error al intentar obtener los datos' })
+        return
+    }
 }
