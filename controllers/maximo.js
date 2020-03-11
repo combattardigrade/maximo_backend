@@ -874,7 +874,7 @@ module.exports.findWorkOrder = async (req, res) => {
     }
 
     const maximo = new Maximo(options)
-    
+
 
     try {
         let resourceset
@@ -902,14 +902,14 @@ module.exports.findWorkOrder = async (req, res) => {
 
         if (workOrders) {
             let assetPromiseArray = []
-            
+
 
             for (let i = 0; i < workOrders.length; i++) {
                 let asset = maximo.resourceobject("MXAPIASSET")
                     .select(["wonum", "description"])
                     .where("assetnum").in([workOrders[i].assetnum])
                     .fetch()
-                assetPromiseArray.push(asset)               
+                assetPromiseArray.push(asset)
             }
 
             let assetResults = await Promise.all(assetPromiseArray)
@@ -927,4 +927,188 @@ module.exports.findWorkOrder = async (req, res) => {
         sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ocurrió un error al intentar obtener los datos' })
         return
     }
+}
+
+module.exports.checkWOHazardVerification = async (req, res) => {
+    const user = req.user.user
+    const password = req.user.password
+    const wonum = req.body.wonum
+
+    if (!user || !password || !wonum) {
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ingresa todos los campos requeridos' })
+        return
+    }
+
+    const options = {
+        protocol: 'https',
+        hostname: process.env.MAXIMO_HOSTNAME,
+        port: process.env.MAXIMO_PORT,
+        user: user,
+        password: password,
+        auth_scheme: '/maximo',
+        authtype: 'maxauth',
+        islean: 1
+    }
+
+    const maximo = new Maximo(options)
+
+
+    try {
+
+        let woRequest = maximo.resourceobject("MXAPIWODETAIL")
+            .select(["worklog"])
+            .where("wonum").in([wonum])
+            .pagesize(20)
+            .fetch()
+
+        // Get user
+        let userRequest = rp('https://' + process.env.MAXIMO_HOSTNAME + `/maximo/oslc/whoami?_lid=${user}&_lpwd=${password}`)
+
+        let response = await Promise.all([woRequest, userRequest])
+        let workOrder = (response[0].thisResourceSet())[0]
+        let myUser = JSON.parse(response[1])
+
+        let logs = []
+        if ('worklog' in workOrder) {
+            logs = workOrder.worklog.filter((log) => {
+                if (log.createby != myUser.personid) return false
+                if (log.description != 'HAZARD VERIFICATION') return false
+                return log
+            })
+        }
+
+        sendJSONresponse(res, 200, { status: 'OK', payload: logs })
+        return
+    }
+    catch (err) {
+        console.log(err)
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ocurrió un error al intentar obtener los datos' })
+        return
+    }
+}
+
+module.exports.sendWOHazardVerification = async (req, res) => {
+    const user = req.user.user
+    const password = req.user.password
+    const wonum = req.body.wonum
+
+    if (!user || !password || !wonum) {
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ingresa todos los campos requeridos' })
+        return
+    }
+
+    const options = {
+        protocol: 'https',
+        hostname: process.env.MAXIMO_HOSTNAME,
+        port: process.env.MAXIMO_PORT,
+        user: user,
+        password: password,
+        auth_scheme: '/maximo',
+        authtype: 'maxauth',
+        islean: 1
+    }
+
+    const maximo = new Maximo(options)
+    let resourceset = await maximo.resourceobject("MXAPIWODETAIL")
+        .select(["href"])
+        .where("wonum").in([wonum])
+        .pagesize(20)
+        .fetch()
+    let workOrder = (resourceset.thisResourceSet())[0]
+    let woHref = workOrder.href
+    woHref = woHref.split('/')
+    woHref = woHref[woHref.length - 1]
+
+    try {
+
+        let response = await rp({
+            uri: `https://${process.env.MAXIMO_HOSTNAME}/maximo/oslc/os/mxapiwodetail/${woHref}?_lid=${user}&_lpwd=${password}`,
+            method: 'POST',
+            body: {
+                'spi:href': workOrder.href,
+                'spi:worklog': [{
+                    'spi:description': 'HAZARD VERIFICATION',
+                    'spi:description_longdescription': 'Tengo permiso de trabajo Aprobado para trabajos riesgosos. Cuento con el equipo y protección necesaria. Realicé LoTo antes de intervenir equipo.'
+                }]
+            },
+            headers: {
+                'x-method-override': 'PATCH',
+                'patchtype': 'MERGE',
+                'properties': 'spi:worklog',
+            },
+            json: true
+        })
+
+
+
+        sendJSONresponse(res, 200, { status: 'OK', payload: response })
+        return
+    }
+    catch (err) {
+        console.log(err)
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ocurrió un error al intentar obtener los datos' })
+        return
+    }
+}
+
+module.exports.getLaborCatalog = async (req, res) => {
+    const user = req.user.user
+    const password = req.user.password
+    const totalResults = req.body.totalResults ? req.body.totalResults : 20
+    const searchMethod = req.body.searchMethod
+    const searchValue = req.body.searchValue
+
+    if (!user || !password) {
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Inicia sesión para realizar la acción' })
+        return
+    }
+
+    const options = {
+        protocol: 'https',
+        hostname: process.env.MAXIMO_HOSTNAME,
+        port: process.env.MAXIMO_PORT,
+        user: user,
+        password: password,
+        auth_scheme: '/maximo',
+        authtype: 'maxauth',
+        islean: 1
+    }
+
+    try {
+        const maximo = new Maximo(options)
+        let resourceset
+
+        if (!searchMethod) {
+            resourceset = await maximo.resourceobject("MXLABOR")
+                .select(["status_description", "laborid", "_rowstamp", "person", "personid",])                
+                .pagesize(totalResults)
+                .fetch()
+
+        }
+        else if (searchMethod == 'personid') {
+            resourceset = await maximo.resourceobject("MXLABOR")
+                .select(["status_description", "laborid", "_rowstamp", "person", "personid",])
+                .where("person.personid").in([searchValue])
+                
+                .pagesize(totalResults)
+                .fetch()
+        }
+        else if (searchMethod == 'displayname') {
+            resourceset = await maximo.resourceobject("MXLABOR")
+                .select(["status_description", "laborid", "_rowstamp", "person", "personid",])
+                .where("person.displayname").in([searchValue])
+                .pagesize(totalResults)
+                .fetch()
+        }       
+
+        const labor = resourceset.thisResourceSet()
+        sendJSONresponse(res, 200, { status: 'OK', payload: labor })
+        return
+    }
+    catch (err) {
+        console.log(err)
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ocurrió un error al intentar obtener los datos' })
+        return
+    }
+
 }

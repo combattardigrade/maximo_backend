@@ -23,6 +23,9 @@ router.get('/woSafety/:wonum', auth, maximoController.getWOSafetyData)
 router.get('/inventory', auth, maximoController.getInventory)
 router.post('/findInventoryItem', auth, maximoController.findInventoryItem)
 router.post('/findWorkOrder', auth, maximoController.findWorkOrder)
+router.post('/checkWOHazardVerification', auth, maximoController.checkWOHazardVerification)
+router.post('/sendWOHazardVerification', auth, maximoController.sendWOHazardVerification)
+router.post('/getLaborCatalog', auth, maximoController.getLaborCatalog)
 
 
 router.post('/task/updateStatus', auth, maximoController.updateTaskStatus)
