@@ -29,6 +29,7 @@ router.post('/checkWOHazardVerification', auth, maximoController.checkWOHazardVe
 router.post('/sendWOHazardVerification', auth, maximoController.sendWOHazardVerification)
 router.post('/getLaborCatalog', auth, maximoController.getLaborCatalog)
 router.get('/getFailureCodes', auth, maximoController.getFailureCodes)
+router.post('/findFailureCode', auth, maximoController.findFailureCode)
 
 
 router.post('/task/updateStatus', auth, maximoController.updateTaskStatus)

@@ -1248,19 +1248,17 @@ module.exports.findLocation = async (req, res) => {
 module.exports.getFailureCodes = async (req, res) => {
     const user = req.user.user
     const password = req.user.password
-
+    
 
     if (!user || !password) {
         sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ingresa todos los campos requeridos' })
         return
     }
 
-
-
     try {
 
 
-        const url = `https://${process.env.MAXIMO_HOSTNAME}/maxrest/rest/mbo/FAILURECODE?_lid=${user}&_lpwd=${password}`
+        const url = `https://${process.env.MAXIMO_HOSTNAME}/maxrest/rest/mbo/FAILURECODE?_lid=${user}&_lpwd=${password}&_maxItems=20`
         console.log(url)
         const response = await new Promise(function (resolve, reject) {
             try {
@@ -1287,11 +1285,22 @@ module.exports.getFailureCodes = async (req, res) => {
                 sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ocurrió un error al intentar obtener los datos' })
             }
         })
-
-        console.log(response.FAILURECODEMboSet.FAILURECODE)
-        return
-
-        sendJSONresponse(res, 200, { status: 'OK', payload: failureCodes })
+        
+        if(!('FAILURECODE' in response.FAILURECODEMboSet)) {
+            sendJSONresponse(res, 404, {status: 'ERROR', message:'No se encontraron resultados'})
+            return
+        }
+        
+        let failureCodes = response.FAILURECODEMboSet.FAILURECODE.map((failureCode) => {           
+            return {
+                failureCode: 'FAILURECODE' in failureCode && failureCode.FAILURECODE[0],
+                description: 'DESCRIPTION' in failureCode && failureCode.DESCRIPTION[0],
+                failureCodeId: 'FAILURECODE' in failureCode && failureCode.FAILURECODEID[0],
+                _rowstamp: 'ATTR' in failureCode && failureCode.ATTR.rowstamp
+            }
+        })       
+       
+        sendJSONresponse(res, 200, { status: 'OK', payload: failureCodes, count: failureCodes.length })
         return
     }
     catch (err) {
@@ -1300,4 +1309,67 @@ module.exports.getFailureCodes = async (req, res) => {
         return
     }
 
+}
+
+module.exports.findFailureCode = async (req,res) => {   
+    const user = req.user.user
+    const password = req.user.password
+    const searchParam = req.body.searchParam
+    const searchValue = req.body.searchValue
+
+    if (!user || !password || !searchParam || !searchValue) {
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ingresa todos los campos requeridos' })
+        return
+    }    
+
+    try {
+        const url = `https://${process.env.MAXIMO_HOSTNAME}/maxrest/rest/mbo/FAILURECODE?${searchParam}=${searchValue}&_lid=${user}&_lpwd=${password}`
+        const response = await new Promise(function (resolve, reject) {
+            try {
+                https.get(url, function (res) {
+                    let data = ''
+                    res.on('data', function (stream) {
+                        data += stream
+                    });
+                    res.on('end', function () {
+                        parser.parseString(data, function (error, result) {
+                            if (error === null) {
+                                resolve(result)
+                            }
+                            else {
+                                reject(error)
+                            }
+                        })
+                    })
+                })
+            }
+            catch (err) {
+                console.log(err)
+                reject(err)
+                sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ocurrió un error al intentar obtener los datos' })
+            }
+        })
+               
+        let failureCode = response.FAILURECODEMboSet.FAILURECODE
+
+        if(!('FAILURECODE' in response.FAILURECODEMboSet)) {
+            sendJSONresponse(res, 404, {status: 'ERROR', message:'No se encontraron resultados'})
+            return
+        }
+        
+        let payload = {
+            failureCode: failureCode[0].FAILURECODE[0],
+            description: failureCode[0].DESCRIPTION[0],
+            failureCodeId: failureCode[0].FAILURECODEID[0],
+            _rowstamp: failureCode[0].ATTR.rowstamp
+        }
+
+        sendJSONresponse(res, 200, { status: 'OK', payload: [payload] })
+        return
+    }
+    catch(err) {
+        console.log(err)
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ocurrió un error al intentar obtener los datos' })
+        return
+    }
 }
