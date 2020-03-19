@@ -851,6 +851,43 @@ module.exports.updateTaskStatus = async (req, res) => {
     // })
 }
 
+module.exports.updateWOStatus = async (req, res) => {
+    const user = req.user.user
+    const password = req.user.password
+    let woHref = req.body.woHref
+    const status = req.body.status
+
+    if (!user || !password || !woHref || !status) {
+        sendJSONresponse(res, 422, { status: 'ERROR', message: 'Ingresa todos los campos requeridos' })
+        return
+    }
+
+    woHref = woHref.split('/')
+    woHref = woHref[woHref.length - 1]
+
+    // Creating and updating resoruces
+    // https://developer.ibm.com/static/site-id/155/maximodev/restguide/Maximo_Nextgen_REST_API.html#_creating_and_updating_resources
+
+
+    let response = await rp({
+        uri: `https://${process.env.MAXIMO_HOSTNAME}/maximo/oslc/os/mxapiwodetail/${woHref}?_lid=${user}&_lpwd=${password}`,
+        method: 'POST',
+        body: {
+            'spi:status': 'COMP'
+        },
+        headers: {
+            'x-method-override': 'PATCH',
+            'properties': 'spi:status',
+
+        },
+        json: true
+    })
+
+    sendJSONresponse(res, 200, { status: 'OK', payload: response })
+    return
+
+}
+
 module.exports.findWorkOrder = async (req, res) => {
     const user = req.user.user
     const password = req.user.password
@@ -1080,7 +1117,7 @@ module.exports.getLaborCatalog = async (req, res) => {
 
         if (!searchMethod) {
             resourceset = await maximo.resourceobject("MXLABOR")
-                .select(["status_description", "laborid", "_rowstamp", "person", "personid",])                
+                .select(["status_description", "laborid", "_rowstamp", "person", "personid",])
                 .pagesize(totalResults)
                 .fetch()
 
@@ -1089,7 +1126,7 @@ module.exports.getLaborCatalog = async (req, res) => {
             resourceset = await maximo.resourceobject("MXLABOR")
                 .select(["status_description", "laborid", "_rowstamp", "person", "personid",])
                 .where("person.personid").in([searchValue])
-                
+
                 .pagesize(totalResults)
                 .fetch()
         }
@@ -1099,10 +1136,162 @@ module.exports.getLaborCatalog = async (req, res) => {
                 .where("person.displayname").in([searchValue])
                 .pagesize(totalResults)
                 .fetch()
-        }       
+        }
 
         const labor = resourceset.thisResourceSet()
         sendJSONresponse(res, 200, { status: 'OK', payload: labor })
+        return
+    }
+    catch (err) {
+        console.log(err)
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ocurrió un error al intentar obtener los datos' })
+        return
+    }
+
+}
+
+module.exports.getLocations = async (req, res) => {
+    const user = req.user.user
+    const password = req.user.password
+
+
+    if (!user || !password) {
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ingresa todos los campos requeridos' })
+        return
+    }
+
+    const options = {
+        protocol: 'https',
+        hostname: process.env.MAXIMO_HOSTNAME,
+        port: process.env.MAXIMO_PORT,
+        user: user,
+        password: password,
+        auth_scheme: '/maximo',
+        authtype: 'maxauth',
+        islean: 1
+    }
+
+    const maximo = new Maximo(options)
+    let jsondata = await maximo.resourceobject("MXAPILOCATION")
+        .select(["location", "siteid", "href"])
+        .pagesize(20)
+        .fetch()
+
+    let locationResponse
+    try {
+        locationResponse = jsondata.thisResourceSet()
+    }
+    catch (e) {
+        console.log(e)
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ocurrió un error al intentar obtener los datos' })
+        return
+    }
+    console.log(locationResponse)
+    sendJSONresponse(res, 200, { status: 'OK', payload: locationResponse })
+    return
+
+}
+
+module.exports.findLocation = async (req, res) => {
+    const user = req.user.user
+    const password = req.user.password
+    const method = req.body.method
+    const value = req.body.value
+
+    if (!user || !password || !method || !value) {
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ingresa todos los campos requeridos' })
+        return
+    }
+
+    const options = {
+        protocol: 'https',
+        hostname: process.env.MAXIMO_HOSTNAME,
+        port: process.env.MAXIMO_PORT,
+        user: user,
+        password: password,
+        auth_scheme: '/maximo',
+        authtype: 'maxauth',
+        islean: 1
+    }
+
+    const maximo = new Maximo(options)
+
+
+    try {
+        let resourceset
+        if (method == 'location') {
+            resourceset = await maximo.resourceobject("MXAPILOCATION")
+                .select(["*"])
+                .where("location").in([value])
+                .pagesize(5)
+                .fetch()
+        } else if (method == 'siteid') {
+            resourceset = await maximo.resourceobject("MXAPIWODETAIL")
+                .select(["*"])
+                .where("siteid").in([value])
+                .pagesize(5)
+                .fetch()
+        }
+
+        let locations = resourceset.thisResourceSet()
+        sendJSONresponse(res, 200, { status: 'OK', payload: locations })
+        return
+
+    }
+    catch (err) {
+        console.log(err)
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ocurrió un error al intentar obtener los datos' })
+        return
+    }
+}
+
+module.exports.getFailureCodes = async (req, res) => {
+    const user = req.user.user
+    const password = req.user.password
+
+
+    if (!user || !password) {
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ingresa todos los campos requeridos' })
+        return
+    }
+
+
+
+    try {
+
+
+        const url = `https://${process.env.MAXIMO_HOSTNAME}/maxrest/rest/mbo/FAILURECODE?_lid=${user}&_lpwd=${password}`
+        console.log(url)
+        const response = await new Promise(function (resolve, reject) {
+            try {
+                https.get(url, function (res) {
+                    let data = ''
+                    res.on('data', function (stream) {
+                        data += stream
+                    });
+                    res.on('end', function () {
+                        parser.parseString(data, function (error, result) {
+                            if (error === null) {
+                                resolve(result)
+                            }
+                            else {
+                                reject(error)
+                            }
+                        })
+                    })
+                })
+            }
+            catch (err) {
+                console.log(err)
+                reject(err)
+                sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ocurrió un error al intentar obtener los datos' })
+            }
+        })
+
+        console.log(response.FAILURECODEMboSet.FAILURECODE)
+        return
+
+        sendJSONresponse(res, 200, { status: 'OK', payload: failureCodes })
         return
     }
     catch (err) {
