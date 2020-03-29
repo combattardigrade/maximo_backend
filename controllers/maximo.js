@@ -1438,7 +1438,7 @@ module.exports.getMaterials = async (req, res) => {
             .pagesize(20)
             .fetch()
 
-        
+
         let materials = resourceset.thisResourceSet()
         sendJSONresponse(res, 200, { status: 'OK', payload: materials })
         return
@@ -1482,7 +1482,16 @@ module.exports.findMaterial = async (req, res) => {
             resourceset = await maximo.resourceobject("MXMATERIAL")
                 .select(["*"])
                 .where("location").in([value])
-
+                .fetch()
+        } else if (method == 'itemnum') {
+            resourceset = await maximo.resourceobject("MXMATERIAL")
+                .select(["*"])
+                .where("itemnum").in([value])
+                .fetch()
+        } else if (method == 'description') {
+            resourceset = await maximo.resourceobject("MXMATERIAL")
+                .select(["*"])
+                .where("description").in([value])
                 .fetch()
         } else {
             resourceset = await maximo.resourceobject("MXMATERIAL")
@@ -1501,4 +1510,37 @@ module.exports.findMaterial = async (req, res) => {
         sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ocurrió un error al intentar obtener los datos' })
         return
     }
+}
+
+module.exports.createWorkOrder = async (req, res) => {
+    const user = req.user.user
+    const password = req.user.password
+    
+
+    if (!user || !password ) {
+        sendJSONresponse(res, 422, { status: 'ERROR', message: 'Ingresa todos los campos requeridos' })
+        return
+    }
+
+    
+
+    // Creating and updating resoruces
+    // https://developer.ibm.com/static/site-id/155/maximodev/restguide/Maximo_Nextgen_REST_API.html#_creating_and_updating_resources
+
+
+    let response = await rp({
+        uri: `https://${process.env.MAXIMO_HOSTNAME}/maximo/oslc/os/mxapiwodetail?_lid=${user}&_lpwd=${password}`,
+        method: 'POST',
+        body: {
+            'spi:wonum': '8888',
+            'spi:description': 'work order created from API',
+            'spi:siteid': '1024'
+        },
+        
+        json: true
+    })
+
+    sendJSONresponse(res, 200, { status: 'OK', payload: response })
+    return
+
 }
