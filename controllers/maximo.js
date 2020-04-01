@@ -4,6 +4,9 @@ const rp = require('request-promise')
 const https = require('https')
 const xml2js = require('xml2js')
 const parser = new xml2js.Parser({ attrkey: "ATTR" })
+var Q = require('q');
+var fs = require("fs");
+var request = require('request');
 
 
 sendJSONresponse = function (res, status, content) {
@@ -1515,32 +1518,206 @@ module.exports.findMaterial = async (req, res) => {
 module.exports.createWorkOrder = async (req, res) => {
     const user = req.user.user
     const password = req.user.password
-    
 
-    if (!user || !password ) {
+
+    if (!user || !password) {
         sendJSONresponse(res, 422, { status: 'ERROR', message: 'Ingresa todos los campos requeridos' })
         return
     }
 
-    
+
 
     // Creating and updating resoruces
     // https://developer.ibm.com/static/site-id/155/maximodev/restguide/Maximo_Nextgen_REST_API.html#_creating_and_updating_resources
 
 
-    let response = await rp({
+    let resourceset = await rp({
         uri: `https://${process.env.MAXIMO_HOSTNAME}/maximo/oslc/os/mxapiwodetail?_lid=${user}&_lpwd=${password}`,
         method: 'POST',
         body: {
-            'spi:wonum': '8888',
-            'spi:description': 'work order created from API',
-            'spi:siteid': '1024'
+            'spi:wonum': '878789',
+            'spi:description': 'work order created from API with attachments',
+            'spi:siteid': '1024',
+            'spi:doclinks': [
+                {
+                    "spi:addinfo": false,
+                    "spi:docinfoid": 430,
+                    "spi:COPYLINKTOWO": "0",
+                    "spi:DESCRIPTION": "Example Attachment via REST API",
+                    "spi:DOCUMENT": "Test via Rest API",
+                    "spi:OWNERTABLE": "WORKORDER",
+                    "spi:UPLOAD": "1",
+                    "spi:NEWURLNAME": "www.ibm.com",
+                    "spi:urltype": "FILE",
+                    "spi:documentdata": "aGV5IGhvdyBhcmUgeW91",
+                    "spi:doctype": "Attachments",
+                    "spi:urlname": "SampleREST-Upload.txt",
+                    "spi:OWNERID": "320450"
+                },
+                
+            ],
+            'spi:href': 'https://gbplant-200-dev.maximo.com:443/maximo/oslc/os/mxwodetail/_MTAyNC84Nzg3ODc-'
         },
-        
+
         json: true
     })
-
-    sendJSONresponse(res, 200, { status: 'OK', payload: response })
+    console.log(resourceset)
+    //let wo = resourceset.thisResourceSet()
+    sendJSONresponse(res, 200, { status: 'OK', payload: resourceset })
     return
 
 }
+
+
+module.exports.createAttachment = function (req, res) {
+    const user = req.user.user
+    const password = req.user.password
+    const URL = `https://${process.env.MAXIMO_HOSTNAME}/maximo/oslc/os/RESTWODOCLINKS/_MTAyNC84Nzg3ODg-?_lid=${user}&_lpwd=${password}`
+    request.post(URL, {
+        form: {
+            "wonum": "RESTTEST",
+            "siteid": "BEDFORD",
+            "orgid": "EAGLENA",
+
+            "doclinks": [
+                {
+                    "ADDINFO": "1",
+                    "COPYLINKTOWO": "0",
+                    "DESCRIPTION": "Example Attachment via REST API",
+                    "DOCUMENT": "Test via Rest API",
+                    "OWNERTABLE": "WORKORDER",
+                    "UPLOAD": "1",
+                    "NEWURLNAME": "www.ibm.com",
+                    "urltype": "FILE",
+                    "documentdata": "aGV5IGhvdyBhcmUgeW91",
+                    "doctype": "Attachments",
+                    "urlname": "SampleREST-Upload.txt",
+                    "OWNERID": "320450"
+                }
+            ]
+        }
+    }, function (err, response, body) {
+        if (err) {
+            console.error(err)
+            return
+        }
+        sendJSONresponse(res, 200, {status: 'OK', payload: body})
+
+        console.log(body)
+    })
+}
+
+module.exports.createAttachment2 = function (req, res) {
+    const user = req.user.user
+    const password = req.user.password
+    const URL = `https://${process.env.MAXIMO_HOSTNAME}/maxrest/rest/os/RESTWODOCLINKS?_lid=${user}&_lpwd=${password}`
+    request.post(URL, {
+        form: {
+            SITEID: '1024',
+            ADDINFO: '1',
+            DOCUMENT: 'REST FILE',
+            DESCRIPTION: 'TESTING REST DOC 2',
+            OWNERTABLE: 'WORKORDER',
+            OWNERID: '320450',
+            DOCTYPE:'Attachments',
+            NEWURLNAME: 'www.ibm.co',
+            URLNAME: 'SampleREST-Upload.txt',
+            URLTYPE: 'FILE',
+            DOCUMENTDATA: 'PT09PT09PT09PT09PT09PT09PT09PT0NCkludGVncmF0aW9uIEZyYW1ld29yaw0KPT09PT09PT09PT09PT09PT09PT09PT0NCg0KUHVyY2hhc2UgT3JkZXIgYXR0YWNobWVudCBURVNU'
+        }
+    }, function(err, response, body) {
+        if(err) {
+            console.error(err)
+            return
+        }
+        
+        console.log(response)
+        console.log(body)
+    })
+}
+
+function getFileBytes(path) {
+    var deferred = Q.defer();
+    var fileSize = 0
+    var buf = new Buffer(fileSize);
+    // ******** Start buffering the file bytes **********************
+    fs.stat(path, function (err, stats) {
+        if (err) {
+            return console.error(err);
+        }
+        console.log(stats.size);
+        fileSize = stats.size;
+        buf = new Buffer(fileSize);
+        var actualBytes = 0;
+        fs.open(path, 'r', function (err, fd) {
+            if (err) {
+                return console.error(err);
+            }
+            console.log("Reading ... ");
+            fs.read(fd, buf, 0, buf.length, 0, function (err, bytes) {
+                if (err) {
+                    console.log(err);
+                }
+                console.log(bytes + " bytes read");
+                console.log("Actual Buffer Size: " + buf.slice(0, bytes).length);
+                deferred.resolve(buf.slice(0, bytes));
+                //return buf.slice(0,bytes);
+            });
+            // Close the opened file.
+            fs.close(fd, function (err) {
+                if (err) {
+                    console.log(err);
+                }
+                console.log("File closed successfully.");
+            });
+        });
+        //*******  End buffering file bytes ******
+    });
+    return deferred.promise;
+}
+
+// var decodedImage = new Buffer(imageData, 'base64').toString('binary');
+// const options = {
+//     protocol: 'https',
+//     hostname: process.env.MAXIMO_HOSTNAME,
+//     port: process.env.MAXIMO_PORT,
+//     user: user,
+//     password: password,
+//     auth_scheme: '/maximo',
+//     authtype: 'maxauth',
+//     islean: 1
+// }
+
+// module.exports.createAttachment = async (req, res) => {
+//     const maximo = new Maximo(options)
+//     const attch = await maximo.resourceobject("MXWODETAIL")
+//         .resource('https://gbplant-200-dev.maximo.com:443/maximo/oslc/os/mxwodetail/_MTAyNC84Nzg3ODc-')
+//         .attachment({
+//             name: 'pmr.doc',
+//             description: 'PMR Recreation Steps',
+//             type: 'FILE',
+//             storeas: 'Attachment',
+//             contentype: 'application/msword',
+//             properties: '*'
+//         })
+// }
+
+//     const maximo = new Maximo(options)
+//     const attch = await maximo.resourceobject("MXWODETAIL")
+//         .resource('https://gbplant-200-dev.maximo.com:443/maximo/oslc/os/mxwodetail/_MTAyNC84Nzg3ODc-')
+//         .attachment({
+//             name: 'pmr.doc',
+//             description: 'PMR Recreation Steps',
+//             type: 'FILE',
+//             storeas: 'Attachment',
+//             contentype: 'application/msword',
+//             properties: '*'
+//         })
+
+//     // console.log(resourceset)
+//     const response = await attch.create(decodedImage)
+//     console.log("Writing Attachment response ");
+//     console.log(response)        
+
+//     sendJSONresponse(res, 200, { status: 'OK', payload: response })
+//     return

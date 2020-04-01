@@ -37,6 +37,7 @@ router.get('/getMaterials', auth, maximoController.getMaterials)
 router.post('/task/updateStatus', auth, maximoController.updateTaskStatus)
 router.post('/createWO', auth, maximoController.createWO)
 router.post('/createWorkOrder', auth, maximoController.createWorkOrder)
+router.post('/createAttachment', auth, maximoController.createAttachment)
 
 router.get('/test', auth, testController.test)
 
