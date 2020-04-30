@@ -41,10 +41,10 @@ module.exports.authentication = (req, res) => {
         // "supervisor", "reportdate", "estdur", "taskid", ])
         .where("status").in(["INPRG", "APPR"])
         .orderby('wonum', 'desc')
-        .pagesize(20)
+        .pagesize(1)
         .fetch()
         .then(async function (resourceset) {
-            console.log(resourceset)
+
 
             if (((resourceset || {}).resourcemboset || {}).Error) {
                 sendJSONresponse(res, 401, { status: 'ERROR', message: resourceset.resourcemboset.Error.message })
@@ -96,7 +96,7 @@ module.exports.getWorkOrders = async (req, res) => {
             "supervisor", "reportdate", "estdur", "taskid", "targstartdate", "jobtaskid", "jpnum",])
         .where("status").in(["INPRG", "APPR"])
         .orderby('wonum', 'desc')
-        .pagesize(20)
+        .pagesize(10)
         .fetch()
 
     workOrders = workOrders.thisResourceSet()
@@ -241,19 +241,21 @@ module.exports.getWorkOrder = async (req, res) => {
     const maximo = new Maximo(options)
 
     let woActualJson = maximo.resourceobject("MXAPIWODETAIL") // MXWODETAIL
-        .select(["*"])
-        .where("wonum").in([wonum])
+        .select(["wonum","wplabor","labtrans","wpmaterial","assetnum","location","matusetrans","supervisor"])
+        .where("wonum").equal([wonum])
         .fetch()
     let woPlansJson = maximo.resourceobject("MXWODETAIL") // with plans
         .select(["*"])
-        .where("wonum").in([wonum])
+        .where("wonum").equal([wonum])
         .fetch()
 
 
-
     let response = await Promise.all([woActualJson, woPlansJson])
+
     let woActual = (response[0].thisResourceSet())[0]
     let woPlans = (response[1].thisResourceSet())[0]
+
+
 
     try {
         // Get completed hrs
@@ -400,7 +402,16 @@ module.exports.getWhoAmI = async (req, res) => {
         return
     }
 
-    let response = await rp('https://' + process.env.MAXIMO_HOSTNAME + `/maximo/oslc/whoami?_lid=${user}&_lpwd=${password}`)
+    const URL = 'https://' + process.env.MAXIMO_HOSTNAME + `/maximo/oslc/whoami?_lid=${user}&_lpwd=${password}`
+
+    let response
+    try {
+        response = await rp(URL)
+    } catch (e) {
+        console.log(e)
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ocurrió un error al intentar obtener los datos' })
+    }
+
     response = JSON.parse(response)
 
     if (!response) {
@@ -625,7 +636,7 @@ module.exports.getWOSafetyData = async (req, res) => {
             let hazardId
 
             try {
-                // HazardId
+                // HazardId               
                 hazardId = hazards[i].HAZARDID[0]
                 if (uniqueIds.includes(hazardId)) {
                     continue;
@@ -642,13 +653,34 @@ module.exports.getWOSafetyData = async (req, res) => {
 
             // Get Precaution
             mbo = await getMBO({ user, password, mbo: 'hazardprec', searchParam: 'hazardid', searchValue: hazardId })
-            let precaution = mbo.HAZARDPRECMboSet.HAZARDPREC[0]
+
+            let hazardDescription, precautionId, precautionDescription
+
+            try {
+                hazardDescription = hazard.DESCRIPTION[0]
+            } catch (e) {
+                hazardDescription: ''
+            }
+
+            try {
+                let precaution = mbo.HAZARDPRECMboSet.HAZARDPREC[0]
+                precautionId = precaution.PRECAUTIONID[0]
+            } catch (e) {
+                precautionId: ''
+            }
+
+            try {
+                let precaution = mbo.HAZARDPRECMboSet.HAZARDPREC[0]
+                precautionDescription = precaution.DESCRIPTION[0]
+            } catch (e) {
+                precautionDescription: ''
+            }
 
             const hazardSafety = {
                 hazardId,
-                hazardDescription: hazard.DESCRIPTION[0],
-                precautionId: precaution.PRECAUTIONID[0],
-                precautionDescription: precaution.DESCRIPTION[0]
+                hazardDescription,
+                precautionId,
+                precautionDescription
             }
 
             hazardsArray.push(hazardSafety)
@@ -1554,7 +1586,7 @@ module.exports.createWorkOrder = async (req, res) => {
                     "spi:urlname": "SampleREST-Upload.txt",
                     "spi:OWNERID": "320450"
                 },
-                
+
             ],
             'spi:href': 'https://gbplant-200-dev.maximo.com:443/maximo/oslc/os/mxwodetail/_MTAyNC84Nzg3ODc-'
         },
@@ -1601,7 +1633,7 @@ module.exports.createAttachment = function (req, res) {
             console.error(err)
             return
         }
-        sendJSONresponse(res, 200, {status: 'OK', payload: body})
+        sendJSONresponse(res, 200, { status: 'OK', payload: body })
 
         console.log(body)
     })
@@ -1619,18 +1651,18 @@ module.exports.createAttachment2 = function (req, res) {
             DESCRIPTION: 'TESTING REST DOC 2',
             OWNERTABLE: 'WORKORDER',
             OWNERID: '320450',
-            DOCTYPE:'Attachments',
+            DOCTYPE: 'Attachments',
             NEWURLNAME: 'www.ibm.co',
             URLNAME: 'SampleREST-Upload.txt',
             URLTYPE: 'FILE',
             DOCUMENTDATA: 'PT09PT09PT09PT09PT09PT09PT09PT0NCkludGVncmF0aW9uIEZyYW1ld29yaw0KPT09PT09PT09PT09PT09PT09PT09PT0NCg0KUHVyY2hhc2UgT3JkZXIgYXR0YWNobWVudCBURVNU'
         }
-    }, function(err, response, body) {
-        if(err) {
+    }, function (err, response, body) {
+        if (err) {
             console.error(err)
             return
         }
-        
+
         console.log(response)
         console.log(body)
     })
