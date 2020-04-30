@@ -241,7 +241,7 @@ module.exports.getWorkOrder = async (req, res) => {
     const maximo = new Maximo(options)
 
     let woActualJson = maximo.resourceobject("MXAPIWODETAIL") // MXWODETAIL
-        .select(["wonum","wplabor","labtrans","wpmaterial","assetnum","location","matusetrans","supervisor"])
+        .select(["wonum", "wplabor", "labtrans", "wpmaterial", "assetnum", "location", "matusetrans", "supervisor"])
         .where("wonum").equal([wonum])
         .fetch()
     let woPlansJson = maximo.resourceobject("MXWODETAIL") // with plans
@@ -1558,7 +1558,7 @@ module.exports.createReportOfWorkDone = async (req, res) => {
     const siteid = req.body.siteid
     const location = req.body.location
     const worktype = req.body.worktype
-    const wopriority = req.body.wopriority 
+    const wopriority = req.body.wopriority
     const downtime = req.body.downtime
     const description_longdescription = req.body.description_longdescription
     const failurecode = req.body.failurecode
@@ -1569,17 +1569,12 @@ module.exports.createReportOfWorkDone = async (req, res) => {
         return
     }
 
-    if(!description || !assetnum || !siteid || !location || !worktype || !wopriority || !failurecode || !actlabhrs) {
-        sendJSONresponse(res, 422, { status: 'ERROR', message: 'Ingresa todos los campos requeridos'})
+    if (!description || !assetnum || !siteid || !location || !worktype || !wopriority || !failurecode || !actlabhrs) {
+        sendJSONresponse(res, 422, { status: 'ERROR', message: 'Ingresa todos los campos requeridos' })
         return
     }
 
-
-    // Creating and updating resoruces
-    // https://developer.ibm.com/static/site-id/155/maximodev/restguide/Maximo_Nextgen_REST_API.html#_creating_and_updating_resources
-
-
-    let resourceset = await rp({
+    rp({
         uri: `https://${process.env.MAXIMO_HOSTNAME}/maximo/oslc/os/mxapiwodetail?_lid=${user}&_lpwd=${password}`,
         method: 'POST',
         body: {
@@ -1615,14 +1610,18 @@ module.exports.createReportOfWorkDone = async (req, res) => {
             // ],
             // 'spi:href': 'https://gbplant-200-dev.maximo.com:443/maximo/oslc/os/mxwodetail/_MTAyNC84Nzg3ODc-'
         },
-
         json: true
     })
-    console.log(resourceset)
-    //let wo = resourceset.thisResourceSet()
-    sendJSONresponse(res, 200, { status: 'OK', payload: resourceset })
-    return
-
+        .then((resourceset) => {
+            console.log(resourceset)
+            sendJSONresponse(res, 200, { status: 'OK', payload: resourceset, message: 'Reporte de trabajo realizado creado correctamente' })
+            return
+        })
+            .catch((err) => {
+                console.log(err)
+                sendJSONresponse(res, 200, { status: 'OK', message: 'message' in err ? err.message : 'Ocurrió un error al intentar realizar la acción'})
+                return
+            })
 }
 
 
