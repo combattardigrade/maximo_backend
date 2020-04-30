@@ -1547,16 +1547,32 @@ module.exports.findMaterial = async (req, res) => {
     }
 }
 
-module.exports.createWorkOrder = async (req, res) => {
+// Report of Work Done
+module.exports.createReportOfWorkDone = async (req, res) => {
     const user = req.user.user
     const password = req.user.password
 
+    // WO
+    const description = req.body.description
+    const assetnum = req.body.assetnum
+    const siteid = req.body.siteid
+    const location = req.body.location
+    const worktype = req.body.worktype
+    const wopriority = req.body.wopriority 
+    const downtime = req.body.downtime
+    const description_longdescription = req.body.description_longdescription
+    const failurecode = req.body.failurecode
+    const actlabhrs = req.body.actlabhrs
 
     if (!user || !password) {
         sendJSONresponse(res, 422, { status: 'ERROR', message: 'Ingresa todos los campos requeridos' })
         return
     }
 
+    if(!description || !assetnum || !siteid || !location || !worktype || !wopriority || !failurecode || !actlabhrs) {
+        sendJSONresponse(res, 422, { status: 'ERROR', message: 'Ingresa todos los campos requeridos'})
+        return
+    }
 
 
     // Creating and updating resoruces
@@ -1567,28 +1583,37 @@ module.exports.createWorkOrder = async (req, res) => {
         uri: `https://${process.env.MAXIMO_HOSTNAME}/maximo/oslc/os/mxapiwodetail?_lid=${user}&_lpwd=${password}`,
         method: 'POST',
         body: {
-            'spi:wonum': '878789',
-            'spi:description': 'work order created from API with attachments',
-            'spi:siteid': '1024',
-            'spi:doclinks': [
-                {
-                    "spi:addinfo": false,
-                    "spi:docinfoid": 430,
-                    "spi:COPYLINKTOWO": "0",
-                    "spi:DESCRIPTION": "Example Attachment via REST API",
-                    "spi:DOCUMENT": "Test via Rest API",
-                    "spi:OWNERTABLE": "WORKORDER",
-                    "spi:UPLOAD": "1",
-                    "spi:NEWURLNAME": "www.ibm.com",
-                    "spi:urltype": "FILE",
-                    "spi:documentdata": "aGV5IGhvdyBhcmUgeW91",
-                    "spi:doctype": "Attachments",
-                    "spi:urlname": "SampleREST-Upload.txt",
-                    "spi:OWNERID": "320450"
-                },
+            //'spi:wonum': '878789',
+            'spi:assetnum': assetnum,
+            'spi:description': description,
+            'spi:siteid': siteid,
+            'spi:location': location,
+            'spi:worktype': worktype,
+            'spi:wopriority': parseInt(wopriority),
+            'spi:downtime': downtime == false ? false : true,
+            'spi:description_longdescription': description_longdescription,
+            'spi:failurecode': failurecode,
+            'spi:actlabhrs': parseFloat(actlabhrs),
+            'spi:status': 'COMP'
+            // 'spi:doclinks': [
+            //     {
+            //         "spi:addinfo": false,
+            //         "spi:docinfoid": 430,
+            //         "spi:COPYLINKTOWO": "0",
+            //         "spi:DESCRIPTION": "Example Attachment via REST API",
+            //         "spi:DOCUMENT": "Test via Rest API",
+            //         "spi:OWNERTABLE": "WORKORDER",
+            //         "spi:UPLOAD": "1",
+            //         "spi:NEWURLNAME": "www.ibm.com",
+            //         "spi:urltype": "FILE",
+            //         "spi:documentdata": "aGV5IGhvdyBhcmUgeW91",
+            //         "spi:doctype": "Attachments",
+            //         "spi:urlname": "SampleREST-Upload.txt",
+            //         "spi:OWNERID": "320450"
+            //     },
 
-            ],
-            'spi:href': 'https://gbplant-200-dev.maximo.com:443/maximo/oslc/os/mxwodetail/_MTAyNC84Nzg3ODc-'
+            // ],
+            // 'spi:href': 'https://gbplant-200-dev.maximo.com:443/maximo/oslc/os/mxwodetail/_MTAyNC84Nzg3ODc-'
         },
 
         json: true
