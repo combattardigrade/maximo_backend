@@ -39,7 +39,12 @@ router.post('/createWO', auth, maximoController.createWO)
 // router.post('/createWorkOrder', auth, maximoController.createWorkOrder)
 router.post('/createAttachment', auth, maximoController.createAttachment)
 
+// WO
+router.put('/wo/status', auth, maximoController.updateWOStatus)
+
+// Create WOs
 router.post('/createReportOfWorkDone', auth, maximoController.createReportOfWorkDone)
+router.post('/createReportOfScheduledWork', auth, maximoController.createReportOfScheduledWork)
 
 router.get('/test', auth, testController.test)
 

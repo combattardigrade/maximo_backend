@@ -902,12 +902,11 @@ module.exports.updateWOStatus = async (req, res) => {
     // Creating and updating resoruces
     // https://developer.ibm.com/static/site-id/155/maximodev/restguide/Maximo_Nextgen_REST_API.html#_creating_and_updating_resources
 
-
-    let response = await rp({
+    rp({
         uri: `https://${process.env.MAXIMO_HOSTNAME}/maximo/oslc/os/mxapiwodetail/${woHref}?_lid=${user}&_lpwd=${password}`,
         method: 'POST',
         body: {
-            'spi:status': 'COMP'
+            'spi:status': status
         },
         headers: {
             'x-method-override': 'PATCH',
@@ -916,9 +915,18 @@ module.exports.updateWOStatus = async (req, res) => {
         },
         json: true
     })
+        .then((response) => {
+            console.log(response)
+            sendJSONresponse(res, 200, { status: 'OK', payload: response, message: 'Orden de Trabajo actualizada correctamente' })
+            return
+        })
+        .catch((err) => {
+            console.log(err)
+            sendJSONresponse(res, 200, { status: 'OK', message: 'Ocurrió un erro al intentar realizar la acción' })
+            return
+        })
 
-    sendJSONresponse(res, 200, { status: 'OK', payload: response })
-    return
+
 
 }
 
@@ -1617,13 +1625,87 @@ module.exports.createReportOfWorkDone = async (req, res) => {
             sendJSONresponse(res, 200, { status: 'OK', payload: resourceset, message: 'Reporte de trabajo realizado creado correctamente' })
             return
         })
-            .catch((err) => {
-                console.log(err)
-                sendJSONresponse(res, 200, { status: 'OK', message: 'message' in err ? err.message : 'Ocurrió un error al intentar realizar la acción'})
-                return
-            })
+        .catch((err) => {
+            console.log(err)
+            sendJSONresponse(res, 200, { status: 'OK', message: 'message' in err ? err.message : 'Ocurrió un error al intentar realizar la acción' })
+            return
+        })
 }
 
+
+// Report of Work Done
+module.exports.createReportOfScheduledWork = async (req, res) => {
+    const user = req.user.user
+    const password = req.user.password
+
+    // WO
+    const description = req.body.description
+    const assetnum = req.body.assetnum
+    const siteid = req.body.siteid
+    const location = req.body.location
+    const worktype = req.body.worktype
+    const wopriority = req.body.wopriority
+    const description_longdescription = req.body.description_longdescription
+    const supervisor = req.body.supervisor // not required
+
+
+    if (!user || !password) {
+        sendJSONresponse(res, 422, { status: 'ERROR', message: 'Ingresa todos los campos requeridos' })
+        return
+    }
+
+    if (!description || !assetnum || !siteid || !location || !worktype || !wopriority) {
+        sendJSONresponse(res, 422, { status: 'ERROR', message: 'Ingresa todos los campos requeridos' })
+        return
+    }
+
+    rp({
+        uri: `https://${process.env.MAXIMO_HOSTNAME}/maximo/oslc/os/mxapiwodetail?_lid=${user}&_lpwd=${password}`,
+        method: 'POST',
+        body: {
+            //'spi:wonum': '878789',
+            'spi:assetnum': assetnum,
+            'spi:description': description,
+            'spi:siteid': siteid,
+            'spi:location': location,
+            'spi:worktype': worktype,
+            'spi:wopriority': parseInt(wopriority),
+            'spi:description_longdescription': description_longdescription,
+            'spi:supervisor': supervisor,
+            'spi:status': 'WSCH' // The work order is waiting to be scheduled
+            // 'spi:doclinks': [
+            //     {
+            //         "spi:addinfo": false,
+            //         "spi:docinfoid": 430,
+            //         "spi:COPYLINKTOWO": "0",
+            //         "spi:DESCRIPTION": "Example Attachment via REST API",
+            //         "spi:DOCUMENT": "Test via Rest API",
+            //         "spi:OWNERTABLE": "WORKORDER",
+            //         "spi:UPLOAD": "1",
+            //         "spi:NEWURLNAME": "www.ibm.com",
+            //         "spi:urltype": "FILE",
+            //         "spi:documentdata": "aGV5IGhvdyBhcmUgeW91",
+            //         "spi:doctype": "Attachments",
+            //         "spi:urlname": "SampleREST-Upload.txt",
+            //         "spi:OWNERID": "320450"
+            //     },
+
+            // ],
+            // 'spi:href': 'https://gbplant-200-dev.maximo.com:443/maximo/oslc/os/mxwodetail/_MTAyNC84Nzg3ODc-'
+        },
+        json: true
+    })
+        .then((resourceset) => {
+            console.log(resourceset)
+            sendJSONresponse(res, 200, { status: 'OK', payload: resourceset, message: 'Reporte de trabajo realizado creado correctamente' })
+            return
+        })
+        .catch((err) => {
+            console.log(err)
+            sendJSONresponse(res, 200, { status: 'OK', message: 'message' in err ? err.message : 'Ocurrió un error al intentar realizar la acción' })
+            return
+        })
+}
 
 module.exports.createAttachment = function (req, res) {
     const user = req.user.user
