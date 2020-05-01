@@ -33,6 +33,7 @@ router.post('/findFailureCode', auth, maximoController.findFailureCode)
 router.post('/findMaterial', auth, maximoController.findMaterial)
 router.get('/getMaterials', auth, maximoController.getMaterials)
 
+router.get('/workOrderTasks/:wonum', auth, maximoController.getWorkOrderTasks)
 
 router.post('/task/updateStatus', auth, maximoController.updateTaskStatus)
 router.post('/createWO', auth, maximoController.createWO)

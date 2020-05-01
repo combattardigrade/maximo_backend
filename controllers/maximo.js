@@ -216,6 +216,41 @@ module.exports.getJobPlan = async (req, res) => {
     return
 }
 
+module.exports.getWorkOrderTasks = async (req, res) => {
+    const user = req.user.user
+    const password = req.user.password
+    const wonum = req.params.wonum
+
+    if (!user || !password || !wonum) {
+        sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ingresa todos los campos requeridos' })
+        return
+    }
+
+    const options = {
+        protocol: 'https',
+        hostname: process.env.MAXIMO_HOSTNAME,
+        port: process.env.MAXIMO_PORT,
+        user: user,
+        password: password,
+        auth_scheme: '/maximo',
+        authtype: 'maxauth',
+        islean: 1
+    }
+
+    // with actual
+    const maximo = new Maximo(options)
+
+    let rep_workorder = await maximo.resourceobject("rep_workorder") 
+        .select(["*"])
+        .where("wonum").equal([wonum])
+        .fetch()
+
+    rep_workorder = rep_workorder.thisResourceSet()
+
+    console.log(rep_workorder)
+    sendJSONresponse(res, 200, { status: 'OK', payload: rep_workorder})
+}
+
 module.exports.getWorkOrder = async (req, res) => {
     const user = req.user.user
     const password = req.user.password
@@ -1705,6 +1740,19 @@ module.exports.createReportOfScheduledWork = async (req, res) => {
             sendJSONresponse(res, 200, { status: 'OK', message: 'message' in err ? err.message : 'Ocurrió un error al intentar realizar la acción' })
             return
         })
+}
+
+module.exports.completeWO = (req, res) => {
+    // WO
+    const description = req.body.description
+    const assetnum = req.body.assetnum
+    const siteid = req.body.siteid
+    const location = req.body.location
+    const worktype = req.body.worktype
+    const wopriority = req.body.wopriority
+    const description_longdescription = req.body.description_longdescription
+    const supervisor = req.body.supervisor // not required
+
 }
 
 module.exports.createAttachment = function (req, res) {
