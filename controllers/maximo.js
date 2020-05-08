@@ -240,7 +240,7 @@ module.exports.getWorkOrderTasks = async (req, res) => {
     // with actual
     const maximo = new Maximo(options)
 
-    let rep_workorder = await maximo.resourceobject("rep_workorder") 
+    let rep_workorder = await maximo.resourceobject("rep_workorder")
         .select(["*"])
         .where("wonum").equal([wonum])
         .fetch()
@@ -248,7 +248,7 @@ module.exports.getWorkOrderTasks = async (req, res) => {
     rep_workorder = rep_workorder.thisResourceSet()
 
     console.log(rep_workorder)
-    sendJSONresponse(res, 200, { status: 'OK', payload: rep_workorder})
+    sendJSONresponse(res, 200, { status: 'OK', payload: rep_workorder })
 }
 
 module.exports.getWorkOrder = async (req, res) => {
@@ -1606,6 +1606,7 @@ module.exports.createReportOfWorkDone = async (req, res) => {
     const description_longdescription = req.body.description_longdescription
     const failurecode = req.body.failurecode
     const actlabhrs = req.body.actlabhrs
+    const reportPhotos = req.body.reportPhotos
 
     if (!user || !password) {
         sendJSONresponse(res, 422, { status: 'ERROR', message: 'Ingresa todos los campos requeridos' })
@@ -1617,52 +1618,65 @@ module.exports.createReportOfWorkDone = async (req, res) => {
         return
     }
 
+    let params = {
+        'spi:assetnum': assetnum,
+        'spi:description': description,
+        'spi:siteid': siteid,
+        'spi:location': location,
+        'spi:worktype': worktype,
+        'spi:wopriority': parseInt(wopriority),
+        'spi:downtime': downtime == false ? false : true,
+        'spi:description_longdescription': description_longdescription,
+        'spi:failurecode': failurecode,
+        'spi:actlabhrs': parseFloat(actlabhrs),
+        'spi:status': 'DOC',
+    }
+
+    let doclinks = []
+    let i = 1
+
+    if (reportPhotos) {
+
+        for (let photo of reportPhotos) {
+            const doc = {
+                "spi:addinfo": false,
+                "spi:docinfoid": 430,
+                "spi:COPYLINKTOWO": "0",
+                "spi:DESCRIPTION": `Attachment ${i}`,
+                "spi:DOCUMENT": `Attachment ${i}`,
+                "spi:OWNERTABLE": "WORKORDER",
+                "spi:UPLOAD": "1",
+                "spi:NEWURLNAME": "www.ibm.com",
+                "spi:urltype": "FILE",
+                "spi:documentdata": photo,
+                "spi:doctype": "Attachments",
+                "spi:urlname": `attachment-${i}.jpg`,
+                "spi:OWNERID": "320450"
+            }
+
+            doclinks.push(doc)
+            i++
+        }
+
+        params = {
+            ...params,
+            'spi:doclinks': doclinks
+        }
+    }
+
     rp({
         uri: `https://${process.env.MAXIMO_HOSTNAME}/maximo/oslc/os/mxapiwodetail?_lid=${user}&_lpwd=${password}`,
         method: 'POST',
-        body: {
-            //'spi:wonum': '878789',
-            'spi:assetnum': assetnum,
-            'spi:description': description,
-            'spi:siteid': siteid,
-            'spi:location': location,
-            'spi:worktype': worktype,
-            'spi:wopriority': parseInt(wopriority),
-            'spi:downtime': downtime == false ? false : true,
-            'spi:description_longdescription': description_longdescription,
-            'spi:failurecode': failurecode,
-            'spi:actlabhrs': parseFloat(actlabhrs),
-            'spi:status': 'COMP'
-            // 'spi:doclinks': [
-            //     {
-            //         "spi:addinfo": false,
-            //         "spi:docinfoid": 430,
-            //         "spi:COPYLINKTOWO": "0",
-            //         "spi:DESCRIPTION": "Example Attachment via REST API",
-            //         "spi:DOCUMENT": "Test via Rest API",
-            //         "spi:OWNERTABLE": "WORKORDER",
-            //         "spi:UPLOAD": "1",
-            //         "spi:NEWURLNAME": "www.ibm.com",
-            //         "spi:urltype": "FILE",
-            //         "spi:documentdata": "aGV5IGhvdyBhcmUgeW91",
-            //         "spi:doctype": "Attachments",
-            //         "spi:urlname": "SampleREST-Upload.txt",
-            //         "spi:OWNERID": "320450"
-            //     },
-
-            // ],
-            // 'spi:href': 'https://gbplant-200-dev.maximo.com:443/maximo/oslc/os/mxwodetail/_MTAyNC84Nzg3ODc-'
-        },
+        body: params,
         json: true
     })
         .then((resourceset) => {
-            console.log(resourceset)
             sendJSONresponse(res, 200, { status: 'OK', payload: resourceset, message: 'Reporte de trabajo realizado creado correctamente' })
             return
         })
         .catch((err) => {
             console.log(err)
-            sendJSONresponse(res, 200, { status: 'OK', message: 'message' in err ? err.message : 'Ocurrió un error al intentar realizar la acción' })
+            sendJSONresponse(res, 422, { status: 'OK', message: 'message' in err ? err.message : 'Ocurrió un error al intentar realizar la acción' })
             return
         })
 }
@@ -1682,7 +1696,7 @@ module.exports.createReportOfScheduledWork = async (req, res) => {
     const wopriority = req.body.wopriority
     const description_longdescription = req.body.description_longdescription
     const supervisor = req.body.supervisor // not required
-
+    const reportPhotos = req.body.reportPhotos
 
     if (!user || !password) {
         sendJSONresponse(res, 422, { status: 'ERROR', message: 'Ingresa todos los campos requeridos' })
@@ -1694,40 +1708,54 @@ module.exports.createReportOfScheduledWork = async (req, res) => {
         return
     }
 
+    let params = {
+        'spi:assetnum': assetnum,
+        'spi:description': description,
+        'spi:siteid': siteid,
+        'spi:location': location,
+        'spi:worktype': worktype,
+        'spi:wopriority': parseInt(wopriority),
+        'spi:description_longdescription': description_longdescription,
+        'spi:supervisor': supervisor,
+        'spi:status': 'WSCH' // The work order is waiting to be scheduled
+    }
+
+    let doclinks = []
+    let i = 1
+
+    if (reportPhotos) {
+
+        for (let photo of reportPhotos) {
+            const doc = {
+                "spi:addinfo": false,
+                "spi:docinfoid": 430,
+                "spi:COPYLINKTOWO": "0",
+                "spi:DESCRIPTION": `Attachment ${i}`,
+                "spi:DOCUMENT": `Attachment ${i}`,
+                "spi:OWNERTABLE": "WORKORDER",
+                "spi:UPLOAD": "1",
+                "spi:NEWURLNAME": "www.ibm.com",
+                "spi:urltype": "FILE",
+                "spi:documentdata": photo,
+                "spi:doctype": "Attachments",
+                "spi:urlname": `attachment-${i}.jpg`,
+                "spi:OWNERID": "320450"
+            }
+
+            doclinks.push(doc)
+            i++
+        }
+
+        params = {
+            ...params,
+            'spi:doclinks': doclinks
+        }
+    }
+
     rp({
         uri: `https://${process.env.MAXIMO_HOSTNAME}/maximo/oslc/os/mxapiwodetail?_lid=${user}&_lpwd=${password}`,
         method: 'POST',
-        body: {
-            //'spi:wonum': '878789',
-            'spi:assetnum': assetnum,
-            'spi:description': description,
-            'spi:siteid': siteid,
-            'spi:location': location,
-            'spi:worktype': worktype,
-            'spi:wopriority': parseInt(wopriority),
-            'spi:description_longdescription': description_longdescription,
-            'spi:supervisor': supervisor,
-            'spi:status': 'WSCH' // The work order is waiting to be scheduled
-            // 'spi:doclinks': [
-            //     {
-            //         "spi:addinfo": false,
-            //         "spi:docinfoid": 430,
-            //         "spi:COPYLINKTOWO": "0",
-            //         "spi:DESCRIPTION": "Example Attachment via REST API",
-            //         "spi:DOCUMENT": "Test via Rest API",
-            //         "spi:OWNERTABLE": "WORKORDER",
-            //         "spi:UPLOAD": "1",
-            //         "spi:NEWURLNAME": "www.ibm.com",
-            //         "spi:urltype": "FILE",
-            //         "spi:documentdata": "aGV5IGhvdyBhcmUgeW91",
-            //         "spi:doctype": "Attachments",
-            //         "spi:urlname": "SampleREST-Upload.txt",
-            //         "spi:OWNERID": "320450"
-            //     },
-
-            // ],
-            // 'spi:href': 'https://gbplant-200-dev.maximo.com:443/maximo/oslc/os/mxwodetail/_MTAyNC84Nzg3ODc-'
-        },
+        body: params,
         json: true
     })
         .then((resourceset) => {
