@@ -33,7 +33,7 @@ module.exports.authentication = (req, res) => {
         authtype: 'maxauth',
         islean: 1
     }
-
+    
     const maximo = new Maximo(options);
     maximo.resourceobject("MXAPIWODETAIL")
         // .select(["wonum", "description", "description_longdescription", "assetnum", 
@@ -44,7 +44,8 @@ module.exports.authentication = (req, res) => {
         .pagesize(1)
         .fetch()
         .then(async function (resourceset) {
-
+            console.log('test')
+            console.log(resourceset)
 
             if (((resourceset || {}).resourcemboset || {}).Error) {
                 sendJSONresponse(res, 401, { status: 'ERROR', message: resourceset.resourcemboset.Error.message })
@@ -63,6 +64,7 @@ module.exports.authentication = (req, res) => {
             return
         })
         .fail(function (error) {
+            console.log('test')
             console.log(error)
             sendJSONresponse(res, 401, { status: 'ERROR', message: 'Ocurrió un error al intentar realizar la operación' })
             return
@@ -276,7 +278,10 @@ module.exports.getWorkOrder = async (req, res) => {
     const maximo = new Maximo(options)
 
     let woActualJson = maximo.resourceobject("MXAPIWODETAIL") // MXWODETAIL
-        .select(["wonum", "wplabor", "labtrans", "wpmaterial", "assetnum", "location", "matusetrans", "supervisor"])
+        .select(["wonum", "wplabor", "labtrans", "wpmaterial", "assetnum", "location", "matusetrans", "supervisor", "owner", "jpnum"])
+        // .select(["wonum", "description", "description_longdescription", "assetnum",
+            // "location", "location.description", "worktype", "wopriority", "gb_abc", "status", "schedstart", "schedfinish",
+            // "supervisor", "reportdate", "estdur", "taskid", "targstartdate", "jobtaskid", "jpnum",])
         .where("wonum").equal([wonum])
         .fetch()
     let woPlansJson = maximo.resourceobject("MXWODETAIL") // with plans
@@ -332,15 +337,22 @@ module.exports.getWorkOrder = async (req, res) => {
         .select(["locations.description"])
         .where("location").in([woActual.location])
         .fetch()
-    response = await Promise.all([asset, location])
+    let woactivity = maximo.resourceobject("rep_workorder")
+        .select(["woactivity"])
+        .where("wonum").in([wonum])
+        .fetch()
+    
+    response = await Promise.all([asset, location, woactivity])
     asset = (response[0].thisResourceSet())[0]
     location = (response[1].thisResourceSet())[0]
-
+    woactivity = (response[2].thisResourceSet())[0]
+   
     let wo = {
         ...woActual,
         ...woPlans,
         assetDescription: asset && asset.description,
-        locationDetails: location
+        locationDetails: location,
+        woactivity: woactivity.woactivity
     }
     sendJSONresponse(res, 200, { status: 'OK', payload: wo })
     return
@@ -1717,7 +1729,7 @@ module.exports.createReportOfScheduledWork = async (req, res) => {
         'spi:wopriority': parseInt(wopriority),
         'spi:description_longdescription': description_longdescription,
         'spi:supervisor': supervisor,
-        'spi:status': 'WSCH' // The work order is waiting to be scheduled
+        'spi:status': 'WAPPR' // The work order is waiting to be scheduled
     }
 
     let doclinks = []
