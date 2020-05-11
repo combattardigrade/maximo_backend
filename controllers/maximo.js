@@ -33,7 +33,7 @@ module.exports.authentication = (req, res) => {
         authtype: 'maxauth',
         islean: 1
     }
-    
+
     const maximo = new Maximo(options);
     maximo.resourceobject("MXAPIWODETAIL")
         // .select(["wonum", "description", "description_longdescription", "assetnum", 
@@ -280,8 +280,8 @@ module.exports.getWorkOrder = async (req, res) => {
     let woActualJson = maximo.resourceobject("MXAPIWODETAIL") // MXWODETAIL
         .select(["wonum", "wplabor", "labtrans", "wpmaterial", "assetnum", "location", "matusetrans", "supervisor", "owner", "jpnum"])
         // .select(["wonum", "description", "description_longdescription", "assetnum",
-            // "location", "location.description", "worktype", "wopriority", "gb_abc", "status", "schedstart", "schedfinish",
-            // "supervisor", "reportdate", "estdur", "taskid", "targstartdate", "jobtaskid", "jpnum",])
+        // "location", "location.description", "worktype", "wopriority", "gb_abc", "status", "schedstart", "schedfinish",
+        // "supervisor", "reportdate", "estdur", "taskid", "targstartdate", "jobtaskid", "jpnum",])
         .where("wonum").equal([wonum])
         .fetch()
     let woPlansJson = maximo.resourceobject("MXWODETAIL") // with plans
@@ -341,12 +341,12 @@ module.exports.getWorkOrder = async (req, res) => {
         .select(["woactivity"])
         .where("wonum").in([wonum])
         .fetch()
-    
+
     response = await Promise.all([asset, location, woactivity])
     asset = (response[0].thisResourceSet())[0]
     location = (response[1].thisResourceSet())[0]
     woactivity = (response[2].thisResourceSet())[0]
-   
+
     let wo = {
         ...woActual,
         ...woPlans,
@@ -1206,14 +1206,14 @@ module.exports.getLaborCatalog = async (req, res) => {
 
         if (!searchMethod) {
             resourceset = await maximo.resourceobject("MXLABOR")
-                .select(["status_description", "laborid", "_rowstamp", "person", "personid",])
+                .select(["status_description", "laborid", "_rowstamp", "person", "personid", "laborcode","craft"])
                 .pagesize(totalResults)
                 .fetch()
 
         }
         else if (searchMethod == 'personid') {
             resourceset = await maximo.resourceobject("MXLABOR")
-                .select(["status_description", "laborid", "_rowstamp", "person", "personid",])
+                .select(["status_description", "laborid", "_rowstamp", "person", "personid", "laborcode","craft"])
                 .where("person.personid").in([searchValue])
 
                 .pagesize(totalResults)
@@ -1221,7 +1221,7 @@ module.exports.getLaborCatalog = async (req, res) => {
         }
         else if (searchMethod == 'displayname') {
             resourceset = await maximo.resourceobject("MXLABOR")
-                .select(["status_description", "laborid", "_rowstamp", "person", "personid",])
+                .select(["status_description", "laborid", "_rowstamp", "person", "personid", "laborcode","craft"])
                 .where("person.displayname").in([searchValue])
                 .pagesize(totalResults)
                 .fetch()
@@ -1782,16 +1782,168 @@ module.exports.createReportOfScheduledWork = async (req, res) => {
         })
 }
 
-module.exports.completeWO = (req, res) => {
-    // WO
-    const description = req.body.description
-    const assetnum = req.body.assetnum
-    const siteid = req.body.siteid
-    const location = req.body.location
-    const worktype = req.body.worktype
-    const wopriority = req.body.wopriority
-    const description_longdescription = req.body.description_longdescription
-    const supervisor = req.body.supervisor // not required
+module.exports.sendWODocumentation = async (req, res) => {
+    // WO    
+    const user = req.user.user
+    const password = req.user.password
+    let woHref = req.body.woHref
+    const comments = req.body.comments
+    const attachments = req.body.attachments
+    const laborTransactions = req.body.laborTransactions
+    const materialTransactions = req.body.materialTransactions
+    const supervisor = req.body.supervisor
+
+    if (!user || !password || !woHref) {
+        sendJSONresponse(res, 422, { status: 'ERROR', message: 'Ingresa todos los campos requeridos' })
+        return
+    }
+
+
+
+    let params = {
+        'spi:href': woHref,
+        // 'spi:status': 'DOC'
+    }
+
+    woHref = woHref.split('/')
+    woHref = woHref[woHref.length - 1]
+
+    if (supervisor) {
+        params = {
+            ...params,
+            'spi:supervisor': supervisor
+        }
+    }
+
+    const matUseTxs = []
+
+    if (!materialTransactions && materialTransactions.length > 0) {
+        for (let material of materialTransactions) {
+            const tx = {
+                'spi:itemnum': material.itemnum,
+                'spi:taskid': parseInt(material.taskid),
+                'spi:quantity': material.quantity,
+                'spi:storeloc': material.storeloc // check if can be removed
+            }
+            matUseTxs.push(tx)
+        }
+        params = {
+            ...params,
+            'spi:matusetrans': matUseTxs
+        }
+    }
+
+    const laborTxs = []
+
+    if (laborTransactions && laborTransactions.length > 0) {
+        for (let labor of laborTransactions) {
+            const tx = {
+                "spi:laborcode": labor.laborcode,                
+                "spi:location": labor.person[0].location,
+                
+
+                
+            }
+            laborTxs.push(tx)
+        }
+        params = {
+            ...params,
+            'spi:labtrans': laborTxs
+        }
+    }
+
+    const worklog = []
+    if (!comments && comments.length > 0) {
+        for (let comment of comments) {
+            const log = {
+                'spi:description': 'Resumen de trabajo',
+                'spi:description_longdescription': comment
+            }
+            worklog.push(log)
+        }
+        params = {
+            ...params,
+            'spi:worklog': worklog
+        }
+    }
+
+    let doclinks = []
+    let i = 1
+
+    if (attachments && attachments.length > 0) {
+
+        for (let photo of attachments) {
+            const doc = {
+                "spi:addinfo": false,
+                "spi:docinfoid": 430,
+                "spi:COPYLINKTOWO": "0",
+                "spi:DESCRIPTION": `Attachment ${i}`,
+                "spi:DOCUMENT": `Attachment ${i}`,
+                "spi:OWNERTABLE": "WORKORDER",
+                "spi:UPLOAD": "1",
+                "spi:NEWURLNAME": "www.ibm.com",
+                "spi:urltype": "FILE",
+                "spi:documentdata": photo,
+                "spi:doctype": "Attachments",
+                "spi:urlname": `attachment-${i}.jpg`,
+                "spi:OWNERID": "320450"
+            }
+
+            doclinks.push(doc)
+            i++
+        }
+
+        params = {
+            ...params,
+            'spi:doclinks': doclinks
+        }
+    }
+
+
+
+    try {
+        console.log(params)
+
+        let response = await rp({
+            uri: `https://${process.env.MAXIMO_HOSTNAME}/maximo/oslc/os/mxapiwodetail/${woHref}?_lid=${user}&_lpwd=${password}`,
+            method: 'POST',
+            body: params,
+            headers: {
+                'x-method-override': 'PATCH',
+                'patchtype': 'MERGE',
+                'properties': 'spi:labtrans',
+            },
+            json: true
+        })
+
+        console.log(response)
+        sendJSONresponse(res, 200, { status: 'OK', message: 'Orden de Trabajo actualizada correctamente' })
+        return
+
+    } catch (err) {
+        console.log(err)
+        sendJSONresponse(res, 200, { status: 'OK', message: 'Ocurrió un error al intentar realizar la acción' })
+        return
+    }
+
+
+    // let response = await rp({
+    //     uri: `https://${process.env.MAXIMO_HOSTNAME}/maximo/oslc/os/mxapiwodetail/${woHref}?_lid=${user}&_lpwd=${password}`,
+    //     method: 'POST',
+    //     body: {
+    //         'spi:href': workOrder.href,
+    //         'spi:worklog': [{
+    //             'spi:description': 'HAZARD VERIFICATION',
+    //             'spi:description_longdescription': 'Tengo permiso de trabajo Aprobado para trabajos riesgosos. Cuento con el equipo y protección necesaria. Realicé LoTo antes de intervenir equipo.'
+    //         }]
+    //     },
+    //     headers: {
+    //         'x-method-override': 'PATCH',
+    //         'patchtype': 'MERGE',
+    //         'properties': 'spi:worklog',
+    //     },
+    //     json: true
+    // })
 
 }
 

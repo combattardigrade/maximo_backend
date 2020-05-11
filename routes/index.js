@@ -47,6 +47,9 @@ router.put('/wo/status', auth, maximoController.updateWOStatus)
 router.post('/createReportOfWorkDone', auth, maximoController.createReportOfWorkDone)
 router.post('/createReportOfScheduledWork', auth, maximoController.createReportOfScheduledWork)
 
+// Complete WO DOC
+router.post('/wo/doc', auth, maximoController.sendWODocumentation)
+
 router.get('/test', auth, testController.test)
 
 module.exports = router
