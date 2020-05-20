@@ -1261,11 +1261,10 @@ module.exports.getLocations = async (req, res) => {
     }
 
     const maximo = new Maximo(options)
-    let jsondata = await maximo.resourceobject("MXAPILOCATIONS")
-        .select(["*"])
-        .pagesize(20)
+    let jsondata = await maximo.resourceobject("MXSTORELOC")
+        .select(["*"])        
         .fetch()
-    console.log(jsondata)
+    
     let locationResponse
     try {
         locationResponse = jsondata.thisResourceSet()
@@ -1309,7 +1308,7 @@ module.exports.findLocation = async (req, res) => {
     try {
         let resourceset
         if (method == 'location') {
-            resourceset = await maximo.resourceobject("MXAPILOCATIONS")
+            resourceset = await maximo.resourceobject("MXSTORELOC")
                 .select(["*"])
                 .where("location").in([value])
                 .pagesize(5)
@@ -1797,8 +1796,7 @@ module.exports.sendWODocumentation = async (req, res) => {
         sendJSONresponse(res, 422, { status: 'ERROR', message: 'Ingresa todos los campos requeridos' })
         return
     }
-
-
+   
 
     let params = {
         'spi:href': woHref,
@@ -1817,7 +1815,7 @@ module.exports.sendWODocumentation = async (req, res) => {
 
     const matUseTxs = []
 
-    if (!materialTransactions && materialTransactions.length > 0) {
+    if (materialTransactions && materialTransactions.length > 0) {
         for (let material of materialTransactions) {
             const tx = {
                 'spi:itemnum': material.itemnum,
@@ -1835,37 +1833,37 @@ module.exports.sendWODocumentation = async (req, res) => {
 
     const laborTxs = []
 
-    if (laborTransactions && laborTransactions.length > 0) {
-        for (let labor of laborTransactions) {
-            const tx = {
-                "spi:laborcode": labor.laborcode,                
-                "spi:location": labor.person[0].location,
+    // if (laborTransactions && laborTransactions.length > 0) {
+    //     for (let labor of laborTransactions) {
+    //         const tx = {
+    //             "spi:laborcode": labor.laborcode,                
+    //             "spi:location": labor.person[0].location,
                 
 
                 
-            }
-            laborTxs.push(tx)
-        }
-        params = {
-            ...params,
-            'spi:labtrans': laborTxs
-        }
-    }
+    //         }
+    //         laborTxs.push(tx)
+    //     }
+    //     params = {
+    //         ...params,
+    //         'spi:labtrans': laborTxs
+    //     }
+    // }
 
     const worklog = []
-    if (!comments && comments.length > 0) {
-        for (let comment of comments) {
-            const log = {
-                'spi:description': 'Resumen de trabajo',
-                'spi:description_longdescription': comment
-            }
-            worklog.push(log)
-        }
-        params = {
-            ...params,
-            'spi:worklog': worklog
-        }
-    }
+    // if (comments && comments.length > 0) {
+    //     for (let comment of comments) {
+    //         const log = {
+    //             'spi:description': 'Resumen de trabajo',
+    //             'spi:description_longdescription': comment
+    //         }
+    //         worklog.push(log)
+    //     }
+    //     params = {
+    //         ...params,
+    //         'spi:worklog': worklog
+    //     }
+    // }
 
     let doclinks = []
     let i = 1
