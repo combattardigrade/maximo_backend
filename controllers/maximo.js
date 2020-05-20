@@ -1206,14 +1206,14 @@ module.exports.getLaborCatalog = async (req, res) => {
 
         if (!searchMethod) {
             resourceset = await maximo.resourceobject("MXLABOR")
-                .select(["status_description", "laborid", "_rowstamp", "person", "personid", "laborcode","craft"])
+                .select(["status_description", "laborid", "_rowstamp", "person", "personid", "laborcode", "craft"])
                 .pagesize(totalResults)
                 .fetch()
 
         }
         else if (searchMethod == 'personid') {
             resourceset = await maximo.resourceobject("MXLABOR")
-                .select(["status_description", "laborid", "_rowstamp", "person", "personid", "laborcode","craft"])
+                .select(["status_description", "laborid", "_rowstamp", "person", "personid", "laborcode", "craft"])
                 .where("person.personid").in([searchValue])
 
                 .pagesize(totalResults)
@@ -1221,7 +1221,7 @@ module.exports.getLaborCatalog = async (req, res) => {
         }
         else if (searchMethod == 'displayname') {
             resourceset = await maximo.resourceobject("MXLABOR")
-                .select(["status_description", "laborid", "_rowstamp", "person", "personid", "laborcode","craft"])
+                .select(["status_description", "laborid", "_rowstamp", "person", "personid", "laborcode", "craft"])
                 .where("person.displayname").in([searchValue])
                 .pagesize(totalResults)
                 .fetch()
@@ -1262,9 +1262,9 @@ module.exports.getLocations = async (req, res) => {
 
     const maximo = new Maximo(options)
     let jsondata = await maximo.resourceobject("MXSTORELOC")
-        .select(["*"])        
+        .select(["*"])
         .fetch()
-    
+
     let locationResponse
     try {
         locationResponse = jsondata.thisResourceSet()
@@ -1570,7 +1570,7 @@ module.exports.findMaterial = async (req, res) => {
         if (method == 'location') {
             resourceset = await maximo.resourceobject("MXMATERIAL")
                 .select(["*"])
-                .where("location").in([value])
+                .where("storeloc").in([value])
                 .fetch()
         } else if (method == 'itemnum') {
             resourceset = await maximo.resourceobject("MXMATERIAL")
@@ -1796,11 +1796,10 @@ module.exports.sendWODocumentation = async (req, res) => {
         sendJSONresponse(res, 422, { status: 'ERROR', message: 'Ingresa todos los campos requeridos' })
         return
     }
-   
 
     let params = {
         'spi:href': woHref,
-        // 'spi:status': 'DOC'
+        'spi:status': 'DOC'
     }
 
     woHref = woHref.split('/')
@@ -1818,10 +1817,11 @@ module.exports.sendWODocumentation = async (req, res) => {
     if (materialTransactions && materialTransactions.length > 0) {
         for (let material of materialTransactions) {
             const tx = {
-                'spi:itemnum': material.itemnum,
+                'spi:gldebitacct': '', // https://www.ibm.com/support/knowledgecenter/es/SSLKT6_7.6.0/com.ibm.mt.doc/gp_finmgr/c_adj_cur_bal_action.html
+                'spi:itemnum': "001-506-055",// material.itemnum,
                 'spi:taskid': parseInt(material.taskid),
-                'spi:quantity': material.quantity,
-                'spi:storeloc': material.storeloc // check if can be removed
+                'spi:quantity': 1,
+                'spi:storeloc': 'ALMC_1717' // material.storeloc 
             }
             matUseTxs.push(tx)
         }
@@ -1833,37 +1833,34 @@ module.exports.sendWODocumentation = async (req, res) => {
 
     const laborTxs = []
 
-    // if (laborTransactions && laborTransactions.length > 0) {
-    //     for (let labor of laborTransactions) {
-    //         const tx = {
-    //             "spi:laborcode": labor.laborcode,                
-    //             "spi:location": labor.person[0].location,
-                
-
-                
-    //         }
-    //         laborTxs.push(tx)
-    //     }
-    //     params = {
-    //         ...params,
-    //         'spi:labtrans': laborTxs
-    //     }
-    // }
+    if (laborTransactions && laborTransactions.length > 0) {
+        for (let labor of laborTransactions) {
+            const tx = {
+                "spi:laborcode": labor.laborcode,                
+                "spi:location": labor.person[0].location,
+            }
+            laborTxs.push(tx)
+        }
+        params = {
+            ...params,
+            'spi:labtrans': laborTxs
+        }
+    }
 
     const worklog = []
-    // if (comments && comments.length > 0) {
-    //     for (let comment of comments) {
-    //         const log = {
-    //             'spi:description': 'Resumen de trabajo',
-    //             'spi:description_longdescription': comment
-    //         }
-    //         worklog.push(log)
-    //     }
-    //     params = {
-    //         ...params,
-    //         'spi:worklog': worklog
-    //     }
-    // }
+    if (comments && comments.length > 0) {
+        for (let comment of comments) {
+            const log = {
+                'spi:description': 'Resumen de trabajo',
+                'spi:description_longdescription': comment
+            }
+            worklog.push(log)
+        }
+        params = {
+            ...params,
+            'spi:worklog': worklog
+        }
+    }
 
     let doclinks = []
     let i = 1
@@ -1897,11 +1894,9 @@ module.exports.sendWODocumentation = async (req, res) => {
         }
     }
 
-
-
     try {
-        console.log(params)
-
+        // console.log(params)
+        
         let response = await rp({
             uri: `https://${process.env.MAXIMO_HOSTNAME}/maximo/oslc/os/mxapiwodetail/${woHref}?_lid=${user}&_lpwd=${password}`,
             method: 'POST',
@@ -1909,18 +1904,19 @@ module.exports.sendWODocumentation = async (req, res) => {
             headers: {
                 'x-method-override': 'PATCH',
                 'patchtype': 'MERGE',
-                'properties': 'spi:labtrans',
+                'properties': '*'// 'spi:labtrans, spi:labtrans, spi:worklog, spi:doclinks',
             },
             json: true
         })
-
+        console.log('test')
         console.log(response)
         sendJSONresponse(res, 200, { status: 'OK', message: 'Orden de Trabajo actualizada correctamente' })
         return
 
     } catch (err) {
         console.log(err)
-        sendJSONresponse(res, 200, { status: 'OK', message: 'Ocurrió un error al intentar realizar la acción' })
+        console.log(err.error['oslc:Error']['oslc:message'])
+        sendJSONresponse(res, 404, { status: 'OK', message: err.error['oslc:Error']['oslc:message'] ? err.error['oslc:Error']['oslc:message'] : 'Ocurrió un error al intentar realizar la acción' })
         return
     }
 
