@@ -1895,7 +1895,7 @@ module.exports.sendWODocumentation = async (req, res) => {
     }
 
     try {
-        // console.log(params)
+        console.log(params)
         
         let response = await rp({
             uri: `https://${process.env.MAXIMO_HOSTNAME}/maximo/oslc/os/mxapiwodetail/${woHref}?_lid=${user}&_lpwd=${password}`,
@@ -1904,7 +1904,7 @@ module.exports.sendWODocumentation = async (req, res) => {
             headers: {
                 'x-method-override': 'PATCH',
                 'patchtype': 'MERGE',
-                'properties': '*'// 'spi:labtrans, spi:labtrans, spi:worklog, spi:doclinks',
+                'properties': '*',
             },
             json: true
         })
