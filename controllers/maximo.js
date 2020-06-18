@@ -1183,6 +1183,12 @@ module.exports.getLaborCatalog = async (req, res) => {
     const totalResults = req.body.totalResults ? req.body.totalResults : 20
     const searchMethod = req.body.searchMethod
     const searchValue = req.body.searchValue
+    const locationSite = req.body.locationSite
+
+    if(!locationSite) {
+        sendJSONresponse(res, 422, { status: 'ERROR', message: 'Ingresa todos los campos requeridos'})
+        return
+    }
 
     if (!user || !password) {
         sendJSONresponse(res, 404, { status: 'ERROR', message: 'Inicia sesión para realizar la acción' })
@@ -1207,15 +1213,15 @@ module.exports.getLaborCatalog = async (req, res) => {
         if (!searchMethod) {
             resourceset = await maximo.resourceobject("MXLABOR")
                 .select(["status_description", "laborid", "_rowstamp", "person", "personid", "laborcode", "craft"])
+                .where("person.locationsite").equal(locationSite)
                 .pagesize(totalResults)
                 .fetch()
-
         }
         else if (searchMethod == 'personid') {
             resourceset = await maximo.resourceobject("MXLABOR")
                 .select(["status_description", "laborid", "_rowstamp", "person", "personid", "laborcode", "craft"])
                 .where("person.personid").in([searchValue])
-
+                .and('person.locationsite').equal(locationSite)
                 .pagesize(totalResults)
                 .fetch()
         }
@@ -1223,10 +1229,11 @@ module.exports.getLaborCatalog = async (req, res) => {
             resourceset = await maximo.resourceobject("MXLABOR")
                 .select(["status_description", "laborid", "_rowstamp", "person", "personid", "laborcode", "craft"])
                 .where("person.displayname").in([searchValue])
+                .and('person.locationsite').equal(locationSite)
                 .pagesize(totalResults)
                 .fetch()
         }
-
+        
         const labor = resourceset.thisResourceSet()
         sendJSONresponse(res, 200, { status: 'OK', payload: labor })
         return
@@ -1262,7 +1269,8 @@ module.exports.getLocations = async (req, res) => {
 
     const maximo = new Maximo(options)
     let jsondata = await maximo.resourceobject("MXSTORELOC")
-        .select(["*"])
+        .select(["href"])
+        
         .fetch()
 
     let locationResponse
