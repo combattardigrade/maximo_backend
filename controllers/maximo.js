@@ -1276,12 +1276,15 @@ module.exports.getLocations = async (req, res) => {
 
     const maximo = new Maximo(options)
     let jsondata = await maximo.resourceobject("MXSTORELOC")
-        .select(["*"])
+        .select(["siteid",])
+        .pagesize(5)
         .fetch()
+        
 
     let locationResponse
     try {
         locationResponse = jsondata.thisResourceSet()
+        console.log(locationResponse)
     }
     catch (e) {
         console.log(e)
@@ -1387,7 +1390,7 @@ module.exports.getFailureCodes = async (req, res) => {
                 sendJSONresponse(res, 404, { status: 'ERROR', message: 'Ocurrió un error al intentar obtener los datos' })
             }
         })
-
+        console.log(response)
         if (!('FAILURECODE' in response.FAILURECODEMboSet)) {
             sendJSONresponse(res, 404, { status: 'ERROR', message: 'No se encontraron resultados' })
             return
