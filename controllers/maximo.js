@@ -1016,7 +1016,7 @@ module.exports.findWorkOrder = async (req, res) => {
         } else if (method == 'description') {
             resourceset = await maximo.resourceobject("MXAPIWODETAIL")
                 .select(["wonum", "description", "description_longdescription", "assetnum",
-                    "location", "location.description", "location.id","worktype", "wopriority", "gb_abc", "status", "schedstart", "schedfinish",
+                    "location", "location.description", "location.id", "worktype", "wopriority", "gb_abc", "status", "schedstart", "schedfinish",
                     "supervisor", "reportdate", "estdur", "taskid", "targstartdate", "jobtaskid", "jpnum",])
                 .where("description").in([value])
                 .orderby('wonum', 'desc')
@@ -1218,14 +1218,12 @@ module.exports.getLaborCatalog = async (req, res) => {
                 .fetch()
         }
         else if (searchMethod == 'laborcode') {
-            
             resourceset = await maximo.resourceobject("MXLABOR")
                 .select(["status_description", "laborid", "_rowstamp", "person", "personid", "laborcode", "craft"])
                 .where("laborcode").in([searchValue])
                 // .and('person.locationsite').equal(locationSite)
                 .pagesize(totalResults)
                 .fetch()
-            console.log(resourceset)
         }
         else if (searchMethod == 'displayname') {
             resourceset = await maximo.resourceobject("MXLABOR")
@@ -1235,9 +1233,9 @@ module.exports.getLaborCatalog = async (req, res) => {
                 .pagesize(totalResults)
                 .fetch()
         }
-        
+
         const labor = resourceset.thisResourceSet()
-        console.log(labor)
+
         sendJSONresponse(res, 200, { status: 'OK', payload: labor })
         return
     }
@@ -1272,7 +1270,7 @@ module.exports.getLocations = async (req, res) => {
 
     const maximo = new Maximo(options)
     let jsondata = await maximo.resourceobject("MXSTORELOC")
-        .select(["*"])        
+        .select(["*"])
         .fetch()
 
     let locationResponse
@@ -1647,10 +1645,19 @@ module.exports.createReportOfWorkDone = async (req, res) => {
         'spi:worktype': worktype,
         'spi:wopriority': parseInt(wopriority),
         'spi:downtime': downtime == false ? false : true,
-        'spi:description_longdescription': description_longdescription,
         'spi:failurecode': failurecode,
         'spi:actlabhrs': parseFloat(actlabhrs),
         'spi:status': 'DOC',
+    }
+
+    if (description_longdescription) {
+        params = {
+            ...params,
+            'spi:worklog': [{
+                'spi:description': 'Comentarios Adicionales',
+                'spi:description_longdescription': description_longdescription
+            }],
+        }
     }
 
     let doclinks = []
@@ -1846,7 +1853,7 @@ module.exports.sendWODocumentation = async (req, res) => {
     if (laborTransactions && laborTransactions.length > 0) {
         for (let labor of laborTransactions) {
             const tx = {
-                "spi:laborcode": labor.laborcode,                
+                "spi:laborcode": labor.laborcode,
                 "spi:location": labor.person[0].location,
             }
             laborTxs.push(tx)
@@ -1906,7 +1913,7 @@ module.exports.sendWODocumentation = async (req, res) => {
 
     try {
         console.log(params)
-        
+
         let response = await rp({
             uri: `https://${process.env.MAXIMO_HOSTNAME}/maximo/oslc/os/mxapiwodetail/${woHref}?_lid=${user}&_lpwd=${password}`,
             method: 'POST',
