@@ -498,7 +498,7 @@ module.exports.getAssets = async (req, res) => {
 
         resourceset = await maximo.resourceobject("MXAPIASSET")
             .select(["*"])
-            .pagesize(50)
+            .pagesize(10)
             .fetch()
 
         if (resourceset) {
@@ -570,17 +570,23 @@ module.exports.findAsset = async (req, res) => {
 
     try {
 
-        if (method == 'assetnum') {
+        if(method == 'description') {
+            resourceset = await maximo.resourceobject("MXASSET") // MXAPIASSET ?
+                .select(["*"])
+                .where("description").in([value])
+                .pagesize(10)
+                .fetch()
+        } else if (method == 'assetnum') {
             resourceset = await maximo.resourceobject("MXASSET") // MXAPIASSET ?
                 .select(["*"])
                 .where("assetnum").in([value])
-                .pagesize(50)
+                .pagesize(10)
                 .fetch()
         } else if (method == 'location') {
             resourceset = await maximo.resourceobject("MXASSET") // MXAPIASSET ?
                 .select(["*"])
                 .where("location").in([value])
-                .pagesize(50)
+                .pagesize(10)
                 .fetch()
         }
 
