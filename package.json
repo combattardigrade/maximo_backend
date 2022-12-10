@@ -17,7 +17,7 @@
     "debug": "4.1.1",
     "dotenv": "6.2.0",
     "email-validator": "2.0.4",
-    "express": "4.16.4",
+    "express": "4.17.3",
     "express-fileupload": "1.1.1-alpha.3",
     "express-jwt": "5.3.1",
     "express-recaptcha": "4.1.1",
